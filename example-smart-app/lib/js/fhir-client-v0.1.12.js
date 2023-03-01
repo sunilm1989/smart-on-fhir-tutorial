@@ -147,8 +147,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var resourceHxPath = resourcePath.slash("_history");
 	        var vreadPath =  resourceHxPath.slash(":versionId || :resource.meta.versionId");
 	        var resourceVersionPath = resourceHxPath.slash(":versionId || :resource.meta.versionId");
-
+		
 	        var ReturnHeader = $$Header('Prefer', 'return=representation');
+		    
+		console.log(ReturnHeader);
 
 	        var $Paging = Middleware(query.$Paging);
 
