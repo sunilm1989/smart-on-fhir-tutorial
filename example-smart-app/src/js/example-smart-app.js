@@ -13,7 +13,7 @@
         var tokenResp = smart.tokenResponse;
         var tr = tokenResp.read();
         alert(tr);
-      },
+      }
       if (smart.hasOwnProperty('patient')) {
         var patient = smart.patient;
         var pt = patient.read();
