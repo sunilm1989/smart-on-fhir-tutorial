@@ -11,7 +11,7 @@
       if (smart.hasOwnProperty('tokenResponse')) {
         alert('i have tokenResponse');
         var tokenResp = smart.tokenResponse;
-        var tr = tokenResp.read();
+        var tr = tokenResp.access_token;
         alert(tr); 
       }
       if (smart.hasOwnProperty('patient')) {
