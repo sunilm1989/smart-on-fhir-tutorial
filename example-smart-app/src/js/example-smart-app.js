@@ -10,6 +10,8 @@
     function onReady(smart)  {
       if (smart.hasOwnProperty('tokenResponse')) {
         alert('i have tokenResponse');
+        var tokenResp = smart.tokenResponse;
+        var tr = tokenResp.read();
       
       }
       if (smart.hasOwnProperty('patient')) {
