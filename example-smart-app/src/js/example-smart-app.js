@@ -22,17 +22,16 @@
         xhttp.open("GET", "https://fhir-open.devcerner.com/dstu2/2c400054-42d8-4e74-87b7-80b5bd5fde9f/Practitioner/5704444");
         xhttp.send();*/
         
-        $.ajax({
-            url: "https://fhir-open.devcerner.com/dstu2/2c400054-42d8-4e74-87b7-80b5bd5fde9f/Practitioner/5704444",
-            contentType: "application/json; charset=utf-8", 
-            type: "GET",
-            success: function (data) {
-               alert(data);
-            },
-            error: function (x, y, z) {
-               alert(x.responseText +"  " +x.status);
-            }
-        });
+        let fetchData = {
+                    method: 'GET',
+                    headers: new Headers({
+                      'Content-Type': 'application/json; charset=UTF-8'
+                    });
+          
+        var url: "https://fhir-open.devcerner.com/dstu2/2c400054-42d8-4e74-87b7-80b5bd5fde9f/Practitioner/5704444",
+        fetch(url, fetchData).then(function() {
+          alert("got response");
+         });   
         
       }
       if (smart.hasOwnProperty('patient')) {
