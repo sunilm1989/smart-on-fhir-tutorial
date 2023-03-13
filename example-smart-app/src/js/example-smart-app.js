@@ -20,7 +20,7 @@
         /*
         const xhttp = new XMLHttpRequest();
         xhttp.open("GET", "https://fhir-open.devcerner.com/dstu2/2c400054-42d8-4e74-87b7-80b5bd5fde9f/Practitioner/5704444");
-        xhttp.send();*/
+        xhttp.send();
         
         var fetchData = {
                     method: 'GET',
@@ -28,9 +28,9 @@
                     };
           
         var url = "https://fhir-open.devcerner.com/dstu2/2c400054-42d8-4e74-87b7-80b5bd5fde9f/Practitioner/5704444";
-        var response =  await fetch(url, fetchData).then(function() {
+        var response = fetch(url, fetchData).then(function() {
           alert("got response");
-         });   
+         });   */
         
       }
       if (smart.hasOwnProperty('patient')) {
