@@ -24,7 +24,7 @@
         
         var fetchData = {
                     method: 'GET',
-                    headers: new Headers({'Content-Type': 'application/json; charset=UTF-8'});
+                    headers: new Headers({'Content-Type': 'application/json; charset=UTF-8'})
                     };
           
         var url = "https://fhir-open.devcerner.com/dstu2/2c400054-42d8-4e74-87b7-80b5bd5fde9f/Practitioner/5704444",
