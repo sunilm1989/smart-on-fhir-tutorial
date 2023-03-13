@@ -14,7 +14,7 @@
         var tr = tokenResp.access_token;
         alert(tr); 
         var jwtTr = tokenResp.id_token
-        JSON.parse(atob(jwtTr.split('.')[1]));
+        alert(JSON.parse(atob(jwtTr.split('.')[1])));
       }
       if (smart.hasOwnProperty('patient')) {
         var patient = smart.patient;
