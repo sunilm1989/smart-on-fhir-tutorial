@@ -12,12 +12,17 @@
         alert('i have tokenResponse');
         var tokenResp = smart.tokenResponse;
         var tr = tokenResp.access_token;
-        alert(tr); 
+        /*alert(tr); 
         var jwtTr = tokenResp.id_token
         var respJwt = JSON.parse(atob(jwtTr.split('.')[1]));
         alert(JSON.stringify(respJwt));
         
-        alert(respJwt.fhirUser);
+        alert(respJwt.fhirUser);*/
+        
+        var id_token = tokenResp.id_token;
+        var payload = jwt.decode(id_token);
+        
+        alert(payload["fhirUser"]);
         
       }
       if (smart.hasOwnProperty('patient')) {
