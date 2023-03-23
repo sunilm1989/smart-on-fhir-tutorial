@@ -17427,7 +17427,7 @@ BBClient.authorize = function(params, errback){
       "redirect_uri="+encodeURIComponent(client.redirect_uri)+"&"+
       "state="+encodeURIComponent(state)+"&"+
       "aud="+encodeURIComponent(params.server)+"&"+
-      "cerner_identifier=+encodeURIComponent('123457678')";
+      "cerner_identifier="+encodeURIComponent('123457678');
     
     if (typeof client.launch !== 'undefined' && client.launch) {
        redirect_to += "&launch="+encodeURIComponent(client.launch);
