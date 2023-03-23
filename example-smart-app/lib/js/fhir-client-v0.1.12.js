@@ -17427,7 +17427,7 @@ BBClient.authorize = function(params, errback){
       "redirect_uri="+encodeURIComponent(client.redirect_uri)+"&"+
       "state="+encodeURIComponent(state)+"&"+
       "aud="+encodeURIComponent(params.server)+"&"+
-      "cerner_Study_Identifier=+encodeURIComponent('UID123')"+"&"+
+      "cerner_StudyIdentifier=+encodeURIComponent('UID123')"+"&"+
       "cerner_View_Mode=+encodeURIComponent('False')"+"&"+
       "cerner_Accession=+encodeURIComponent('000CV2023001234')";
     
