@@ -225,7 +225,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	      '[object RegExp]': 'regexp',
 	      '[object Object]': 'object'
 	    };
-	    return classToType[Object.prototype.toString.call(obj)];
+	    return classToType[Object.prototype.toString.call(obj)];f
 	  };
 
 	  exports.type = type;
