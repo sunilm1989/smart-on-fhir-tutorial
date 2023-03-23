@@ -17428,7 +17428,7 @@ BBClient.authorize = function(params, errback){
       "state="+encodeURIComponent(state)+"&"+
       "aud="+encodeURIComponent(params.server)+"&"+
       "cerner_StudyIdentifier=+encodeURIComponent('UID123')"+"&"+
-      "cerner_View_Mode=+encodeURIComponent('False')"+"&"+
+      "cerner_View Mode=+encodeURIComponent('False')"+"&"+
       "cerner_Accession=+encodeURIComponent('000CV2023001234')";
     
     if (typeof client.launch !== 'undefined' && client.launch) {
