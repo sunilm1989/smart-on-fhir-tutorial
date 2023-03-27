@@ -62,7 +62,7 @@
               lname = patient.name[0].family;
             }
             else{
-              lname = patient.name[0].family.jion(' ');
+              lname = patient.name[0].family.join(' ');
             }
           }
 
