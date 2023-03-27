@@ -58,11 +58,11 @@
 
           if (typeof patient.name[0] !== 'undefined') {
             fname = patient.name[0].given.join(' ');
-            if(patient.name[0].family.length){
-              lname = patient.name[0].family.join(' ');
+            if(Array.isArray(patient.name[0].family)){
+              lname = patient.name[0].family;
             }
             else{
-              lname = patient.name[0].family;
+              lname = patient.name[0].family.jion(' ');
             }
           }
 
