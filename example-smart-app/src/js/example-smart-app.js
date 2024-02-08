@@ -17,6 +17,9 @@
         var respJwt = JSON.parse(atob(jwtTr.split('.')[1]));
        
         alert(respJwt.fhirUser);
+
+        var fwObj = window.external.DiscernObjectFactory("PVFRAMEWORKLINK");
+        fwObj.SetPendingData(1);
         /*
         const xhttp = new XMLHttpRequest();
         xhttp.open("GET", "https://fhir-open.devcerner.com/dstu2/2c400054-42d8-4e74-87b7-80b5bd5fde9f/Practitioner/5704444");
