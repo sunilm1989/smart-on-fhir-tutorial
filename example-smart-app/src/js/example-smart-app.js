@@ -17,7 +17,7 @@
         var respJwt = JSON.parse(atob(jwtTr.split('.')[1]));
        
         alert(respJwt.fhirUser);
-
+        alert("Setting the PVFRAMEWORKLINK");
         var fwObj = window.external.DiscernObjectFactory("PVFRAMEWORKLINK");
         fwObj.SetPendingData(1);
         /*
