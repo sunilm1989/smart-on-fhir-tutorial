@@ -4,7 +4,7 @@
     alert("window.extractData");
     alert("Setting the PVFRAMEWORKLINK");
     var fwObj = window.external.DiscernObjectFactory("PVFRAMEWORKLINK");
-    fwObj.SetPendingData(1);
+    fwObj.SetPendingData(2);
     function onError() {
       console.log('Loading error', arguments);
       ret.reject();
