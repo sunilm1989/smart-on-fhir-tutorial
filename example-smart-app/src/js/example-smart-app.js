@@ -903,6 +903,9 @@
       '.smart-ecg-scale { color: #0d45bf; font-size: .9rem; font-weight: 800; }',
       '.smart-ecg-stage { position: relative; min-width: 0; overflow: hidden; background-color: #fff9f8; background-image: linear-gradient(rgba(230,73,73,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(230,73,73,.18) 1px, transparent 1px), linear-gradient(rgba(210,48,48,.35) 2px, transparent 2px), linear-gradient(90deg, rgba(210,48,48,.35) 2px, transparent 2px); background-size: 8px 8px, 8px 8px, 40px 40px, 40px 40px; }',
       '.smart-ecg-svg { position: absolute; inset: 0; width: 100%; height: 100%; }',
+      '.smart-ecg-grid-background { fill: #fff9f8; }',
+      '.smart-ecg-grid-small { fill: none; stroke: rgba(230,73,73,.22); stroke-width: 1; }',
+      '.smart-ecg-grid-large { fill: none; stroke: rgba(210,48,48,.42); stroke-width: 2; }',
       '.smart-ecg-line { fill: none; stroke: #24292f; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }',
       '.smart-ecg-lead-label, .smart-ecg-paper-caption { fill: #0d45bf; font-size: 13px; font-weight: 800; }',
       '.smart-ecg-lead-marker, .smart-ecg-calibration { fill: none; stroke: #0d45bf; stroke-width: 3; stroke-linecap: square; stroke-linejoin: miter; }',
@@ -942,6 +945,7 @@
       '.smart-ecg-event-monitor { position: fixed; right: 1rem; bottom: 1.15rem; z-index: 50; min-width: 18rem; max-width: min(32rem, calc(100vw - 2rem)); padding: .65rem .8rem; color: #10213a; background: #fff; border: 1px solid #88b7ff; border-left: 5px solid #0d45bf; border-radius: 4px; box-shadow: 0 .35rem 1rem rgba(21,49,91,.18); font-size: .78rem; line-height: 1.35; }',
       '.smart-ecg-event-monitor strong { display: block; margin-bottom: .2rem; color: #0d45bf; font-size: .78rem; }',
       '.smart-ecg-event-monitor code { font-family: Menlo, Consolas, monospace; font-size: .74rem; }',
+      '@media print { .smart-ecg-event-monitor { display: none !important; } .smart-ecg-stage, .smart-ecg-svg { -webkit-print-color-adjust: exact; print-color-adjust: exact; } body.smart-ecg-body { overflow: visible; background: #fff; } }',
       '@media (max-width: 1100px) { body.smart-ecg-body { overflow: auto; } .smart-ecg-app { grid-template-columns: 1fr; height: auto; min-height: 100vh; } .smart-ecg-viewer { min-height: 680px; border-right: 0; border-bottom: 1px solid #9aa5b4; } .smart-ecg-details { grid-template-rows: 2.75rem auto auto; } }',
       '@media (max-width: 720px) { .smart-ecg-metrics { overflow-x: auto; } .smart-ecg-viewer { grid-template-rows: 3rem 2.25rem 560px; min-height: 0; } .smart-ecg-patient-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .smart-ecg-field.smart-ecg-span-2 { grid-column: span 1; } .smart-ecg-data-grid, .smart-ecg-data-grid.smart-ecg-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } .smart-ecg-data-grid.smart-ecg-one { grid-template-columns: 1fr; } }'
     ].join('\n');
@@ -1296,6 +1300,47 @@
     svg.appendChild(text);
   }
 
+  function drawEcgPaperGrid(svg) {
+    var smallPath = '';
+    var largePath = '';
+    var x;
+    var y;
+
+    svg.appendChild(addSvg('rect', {
+      'class': 'smart-ecg-grid-background',
+      x: 0,
+      y: 0,
+      width: WIDTH,
+      height: HEIGHT
+    }));
+
+    for (x = 0; x <= WIDTH; x += 8) {
+      smallPath += 'M' + x + ' 0V' + HEIGHT + ' ';
+    }
+
+    for (y = 0; y <= HEIGHT; y += 8) {
+      smallPath += 'M0 ' + y + 'H' + WIDTH + ' ';
+    }
+
+    for (x = 0; x <= WIDTH; x += 40) {
+      largePath += 'M' + x + ' 0V' + HEIGHT + ' ';
+    }
+
+    for (y = 0; y <= HEIGHT; y += 40) {
+      largePath += 'M0 ' + y + 'H' + WIDTH + ' ';
+    }
+
+    svg.appendChild(addSvg('path', {
+      'class': 'smart-ecg-grid-small',
+      d: smallPath
+    }));
+
+    svg.appendChild(addSvg('path', {
+      'class': 'smart-ecg-grid-large',
+      d: largePath
+    }));
+  }
+
   function drawEcgChart() {
     var svg = byId('smart-ecg-chart');
     var rhythmLabel;
@@ -1310,6 +1355,7 @@
     }
 
     svg.setAttribute('viewBox', '0 0 ' + WIDTH + ' ' + HEIGHT);
+    drawEcgPaperGrid(svg);
 
     for (i = 0; i < LEADS.length; i += 1) {
       drawLead(svg, LEADS[i]);
