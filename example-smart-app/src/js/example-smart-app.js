@@ -728,7 +728,9 @@
       '.smart-ecg-cell-label { display: block; margin-bottom: .3rem; color: #8993a1; font-size: .76rem; font-weight: 800; }',
       '.smart-ecg-cell-value { display: block; overflow-wrap: anywhere; color: #202833; font-size: .8rem; font-weight: 800; }',
       '.smart-ecg-interpretation { padding: .75rem .78rem 1.2rem; font-size: .78rem; font-weight: 800; line-height: 1.45; white-space: pre-line; }',
-      '.smart-ecg-save { position: fixed; right: 1.1rem; bottom: 1.15rem; display: inline-flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; color: #0d2448; background: #88b7ff; border: 0; border-radius: 50%; box-shadow: 0 .35rem 1rem rgba(21,49,91,.28); }',
+      '.smart-ecg-floating-actions { position: fixed; right: 1.1rem; bottom: 1.15rem; display: flex; align-items: center; gap: .5rem; }',
+      '.smart-ecg-floating-button { display: inline-flex; align-items: center; justify-content: center; min-width: 4.6rem; height: 2.65rem; padding: 0 .85rem; color: #0d2448; background: #88b7ff; border: 0; border-radius: 4px; box-shadow: 0 .35rem 1rem rgba(21,49,91,.28); font-size: .82rem; font-weight: 800; }',
+      '.smart-ecg-floating-button.smart-ecg-floating-sign { color: #fff; background: #25703a; }',
       '@media (max-width: 1100px) { body.smart-ecg-body { overflow: auto; } .smart-ecg-app { grid-template-columns: 1fr; height: auto; min-height: 100vh; } .smart-ecg-viewer { min-height: 680px; border-right: 0; border-bottom: 1px solid #9aa5b4; } .smart-ecg-details { grid-template-rows: 2.75rem auto auto; } }',
       '@media (max-width: 720px) { .smart-ecg-metrics { overflow-x: auto; } .smart-ecg-viewer { grid-template-rows: 3rem 2.25rem 560px; min-height: 0; } .smart-ecg-patient-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .smart-ecg-field.smart-ecg-span-2 { grid-column: span 1; } .smart-ecg-data-grid, .smart-ecg-data-grid.smart-ecg-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } .smart-ecg-data-grid.smart-ecg-one { grid-template-columns: 1fr; } }'
     ].join('\n');
@@ -875,7 +877,10 @@
       '</div>',
       '</aside>',
       '</div>',
-      '<button class="smart-ecg-save" id="smart-ecg-floating-save" type="button" title="Save ECG" aria-label="Save ECG">', icon('save'), '</button>'
+      '<div class="smart-ecg-floating-actions">',
+      '<button class="smart-ecg-floating-button" id="smart-ecg-floating-save" type="button" title="Save ECG" aria-label="Save ECG">Save</button>',
+      '<button class="smart-ecg-floating-button smart-ecg-floating-sign" id="smart-ecg-floating-sign" type="button" title="Sign ECG" aria-label="Sign ECG">Sign</button>',
+      '</div>'
     ].join('');
   }
 
@@ -1204,6 +1209,7 @@
     var saveButton = byId('smart-ecg-save');
     var floatingSaveButton = byId('smart-ecg-floating-save');
     var signButton = byId('smart-ecg-sign');
+    var floatingSignButton = byId('smart-ecg-floating-sign');
 
     if (printButton) {
       printButton.onclick = function() {
@@ -1231,6 +1237,15 @@
 
     if (signButton) {
       signButton.onclick = function() {
+        if (saveEcg('Signed')) {
+          setEditMode(false);
+          setSourceStatus('Signed');
+        }
+      };
+    }
+
+    if (floatingSignButton) {
+      floatingSignButton.onclick = function() {
         if (saveEcg('Signed')) {
           setEditMode(false);
           setSourceStatus('Signed');
