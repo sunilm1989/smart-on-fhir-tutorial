@@ -6,6 +6,7 @@
   var HEIGHT = 680;
   var STYLE_ID = 'smart-ecg-styles';
   var EVENT_NAME = 'CARDIOLOGY_VIEWER_EVENT';
+  var SHOW_EVENT_ALERTS = true;
   var currentStudyId = '';
   var dirtyDataSent = false;
 
@@ -263,6 +264,15 @@
     var event;
 
     logTroubleshooting('event triggered: ' + action, payload);
+
+    if (SHOW_EVENT_ALERTS) {
+      window.alert(
+        EVENT_NAME + '\n' +
+        'Action: ' + action + '\n' +
+        'Study ID: ' + detail.context.studyId + '\n' +
+        'Data: ' + String(detail.context.data)
+      );
+    }
 
     try {
       event = new window.CustomEvent(EVENT_NAME, { detail: detail });
