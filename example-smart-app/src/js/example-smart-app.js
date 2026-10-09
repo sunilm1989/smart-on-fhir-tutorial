@@ -264,6 +264,7 @@
     var event;
 
     logTroubleshooting('event triggered: ' + action, payload);
+    updateEventMonitor(action, detail.context.studyId, detail.context.data);
 
     if (SHOW_EVENT_ALERTS) {
       window.alert(
@@ -914,6 +915,9 @@
       '.smart-ecg-floating-actions { position: fixed; right: 1.1rem; bottom: 1.15rem; display: flex; align-items: center; gap: .5rem; }',
       '.smart-ecg-floating-button { display: inline-flex; align-items: center; justify-content: center; min-width: 4.6rem; height: 2.65rem; padding: 0 .85rem; color: #0d2448; background: #88b7ff; border: 0; border-radius: 4px; box-shadow: 0 .35rem 1rem rgba(21,49,91,.28); font-size: .82rem; font-weight: 800; }',
       '.smart-ecg-floating-button.smart-ecg-floating-sign { color: #fff; background: #25703a; }',
+      '.smart-ecg-event-monitor { position: fixed; left: 1rem; bottom: 1.15rem; z-index: 50; min-width: 18rem; max-width: min(32rem, calc(100vw - 2rem)); padding: .65rem .8rem; color: #10213a; background: #fff; border: 1px solid #88b7ff; border-left: 5px solid #0d45bf; border-radius: 4px; box-shadow: 0 .35rem 1rem rgba(21,49,91,.18); font-size: .78rem; line-height: 1.35; }',
+      '.smart-ecg-event-monitor strong { display: block; margin-bottom: .2rem; color: #0d45bf; font-size: .78rem; }',
+      '.smart-ecg-event-monitor code { font-family: Menlo, Consolas, monospace; font-size: .74rem; }',
       '@media (max-width: 1100px) { body.smart-ecg-body { overflow: auto; } .smart-ecg-app { grid-template-columns: 1fr; height: auto; min-height: 100vh; } .smart-ecg-viewer { min-height: 680px; border-right: 0; border-bottom: 1px solid #9aa5b4; } .smart-ecg-details { grid-template-rows: 2.75rem auto auto; } }',
       '@media (max-width: 720px) { .smart-ecg-metrics { overflow-x: auto; } .smart-ecg-viewer { grid-template-rows: 3rem 2.25rem 560px; min-height: 0; } .smart-ecg-patient-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .smart-ecg-field.smart-ecg-span-2 { grid-column: span 1; } .smart-ecg-data-grid, .smart-ecg-data-grid.smart-ecg-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } .smart-ecg-data-grid.smart-ecg-one { grid-template-columns: 1fr; } }'
     ].join('\n');
@@ -1064,6 +1068,10 @@
       '<div class="smart-ecg-floating-actions">',
       '<button class="smart-ecg-floating-button" id="smart-ecg-floating-save" type="button" title="Save ECG" aria-label="Save ECG">Save</button>',
       '<button class="smart-ecg-floating-button smart-ecg-floating-sign" id="smart-ecg-floating-sign" type="button" title="Sign ECG" aria-label="Sign ECG">Sign</button>',
+      '</div>',
+      '<div class="smart-ecg-event-monitor" id="smart-ecg-event-monitor" aria-live="polite">',
+      '<strong>Event monitor</strong>',
+      '<span>Waiting for Save, Sign, Edit, or Close action.</span>',
       '</div>'
     ].join('');
   }
@@ -1311,6 +1319,34 @@
 
   function setSourceStatus(value) {
     setText('ecg-source-status', value);
+  }
+
+  function escapeHtml(value) {
+    return String(value === undefined || value === null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function updateEventMonitor(action, studyId, data) {
+    var monitor = byId('smart-ecg-event-monitor');
+    var now = new Date();
+
+    if (!monitor) {
+      return;
+    }
+
+    monitor.innerHTML = [
+      '<strong>Event triggered</strong>',
+      '<div>Action: <code>', escapeHtml(action), '</code></div>',
+      '<div>Study ID: <code>', escapeHtml(studyId || 'UNKNOWN_STUDY'), '</code></div>',
+      '<div>Data: <code>', escapeHtml(String(data)), '</code></div>',
+      '<div>Time: <code>',
+      pad(now.getHours()), ':', pad(now.getMinutes()), ':', pad(now.getSeconds()),
+      '</code></div>'
+    ].join('');
   }
 
   function bodyHasClass(className) {
