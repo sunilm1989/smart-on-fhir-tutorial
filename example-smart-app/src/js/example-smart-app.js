@@ -866,7 +866,7 @@
       'html, body { height: 100%; }',
       'body.smart-ecg-body { margin: 0; background: #eef1f5; color: #202833; font-family: Arial, Helvetica, sans-serif; overflow: hidden; }',
       '.smart-ecg-app, .smart-ecg-app * { box-sizing: border-box; }',
-      '.smart-ecg-app { display: -ms-grid; display: grid; -ms-grid-columns: minmax(680px, 1fr) 32rem; grid-template-columns: minmax(680px, 1fr) 32rem; height: 100vh; min-height: 640px; background: #fff; }',
+      '.smart-ecg-app { display: -ms-grid; display: grid; -ms-grid-columns: minmax(620px, 1fr) 40rem; grid-template-columns: minmax(620px, 1fr) 40rem; height: 100vh; min-height: 640px; background: #fff; }',
       '.smart-ecg-viewer { display: -ms-grid; display: grid; -ms-grid-rows: 3rem 2.25rem minmax(0, 1fr); grid-template-rows: 3rem 2.25rem minmax(0, 1fr); min-width: 0; border-right: 1px solid #9aa5b4; }',
       '.smart-ecg-metrics { display: flex; align-items: stretch; min-width: 0; overflow: hidden; background: #f4f6f8; border-bottom: 1px solid #ccd2da; }',
       '.smart-ecg-metric { min-width: 4.5rem; padding: .34rem .45rem; border-right: 1px solid #d9dee5; line-height: 1.05; }',
@@ -890,7 +890,7 @@
       '.smart-ecg-actions { display: flex; gap: .2rem; }',
       '.smart-ecg-actions .smart-ecg-button { color: #fff; background: transparent; }',
       '.smart-ecg-actions .smart-ecg-button:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.22); }',
-      '.smart-ecg-command { width: auto; min-width: 4rem; padding: 0 .65rem; gap: .3rem; color: #fff; border-color: rgba(255,255,255,.22); font-size: .76rem; font-weight: 800; }',
+      '.smart-ecg-command { color: #fff; border-color: rgba(255,255,255,.22); font-size: .76rem; font-weight: 800; }',
       '.smart-ecg-command.smart-ecg-sign { background: rgba(37, 111, 58, .9); }',
       '.smart-ecg-command.smart-ecg-save-action { background: rgba(255,255,255,.12); }',
       'body.smart-ecg-editing .smart-ecg-field-value, body.smart-ecg-editing .smart-ecg-cell-value, body.smart-ecg-editing .smart-ecg-interpretation { outline: 2px solid #88b7ff; background: #fff; }',
@@ -912,9 +912,6 @@
       '.smart-ecg-cell-label { display: block; margin-bottom: .3rem; color: #8993a1; font-size: .76rem; font-weight: 800; }',
       '.smart-ecg-cell-value { display: block; overflow-wrap: anywhere; color: #202833; font-size: .8rem; font-weight: 800; }',
       '.smart-ecg-interpretation { padding: .75rem .78rem 1.2rem; font-size: .78rem; font-weight: 800; line-height: 1.45; white-space: pre-line; }',
-      '.smart-ecg-floating-actions { position: fixed; right: 1.1rem; bottom: 1.15rem; display: flex; align-items: center; gap: .5rem; }',
-      '.smart-ecg-floating-button { display: inline-flex; align-items: center; justify-content: center; min-width: 4.6rem; height: 2.65rem; padding: 0 .85rem; color: #0d2448; background: #88b7ff; border: 0; border-radius: 4px; box-shadow: 0 .35rem 1rem rgba(21,49,91,.28); font-size: .82rem; font-weight: 800; }',
-      '.smart-ecg-floating-button.smart-ecg-floating-sign { color: #fff; background: #25703a; }',
       '.smart-ecg-event-monitor { position: fixed; left: 1rem; bottom: 1.15rem; z-index: 50; min-width: 18rem; max-width: min(32rem, calc(100vw - 2rem)); padding: .65rem .8rem; color: #10213a; background: #fff; border: 1px solid #88b7ff; border-left: 5px solid #0d45bf; border-radius: 4px; box-shadow: 0 .35rem 1rem rgba(21,49,91,.18); font-size: .78rem; line-height: 1.35; }',
       '.smart-ecg-event-monitor strong { display: block; margin-bottom: .2rem; color: #0d45bf; font-size: .78rem; }',
       '.smart-ecg-event-monitor code { font-family: Menlo, Consolas, monospace; font-size: .74rem; }',
@@ -949,6 +946,7 @@
       link: '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l2-2a5 5 0 0 0-7.07-7.07l-1.15 1.15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-2 2a5 5 0 0 0 7.07 7.07l1.15-1.15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>',
       print: '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg>',
       edit: '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13 7l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path></svg>',
+      sign: '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4 21h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>',
       menu: '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>',
       down: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4z" fill="currentColor"></path></svg>',
       save: '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h11l3 3v15H5z" fill="currentColor"></path><path d="M8 3v6h8V3M8 18h8v3H8z" fill="#f7fbff"></path></svg>'
@@ -1024,8 +1022,8 @@
       '<button class="smart-ecg-button" type="button" title="Copy link" aria-label="Copy link">', icon('link'), '</button>',
       '<button class="smart-ecg-button" id="smart-ecg-print" type="button" title="Print" aria-label="Print">', icon('print'), '</button>',
       '<button class="smart-ecg-button" id="smart-ecg-edit" type="button" title="Edit interpretation" aria-label="Edit interpretation">', icon('edit'), '</button>',
-      '<button class="smart-ecg-button smart-ecg-command smart-ecg-save-action" id="smart-ecg-save" type="button" title="Save ECG" aria-label="Save ECG">Save</button>',
-      '<button class="smart-ecg-button smart-ecg-command smart-ecg-sign" id="smart-ecg-sign" type="button" title="Sign ECG" aria-label="Sign ECG">Sign</button>',
+      '<button class="smart-ecg-button smart-ecg-command smart-ecg-save-action" id="smart-ecg-save" type="button" title="Save ECG" aria-label="Save ECG">', icon('save'), '</button>',
+      '<button class="smart-ecg-button smart-ecg-command smart-ecg-sign" id="smart-ecg-sign" type="button" title="Sign ECG" aria-label="Sign ECG">', icon('sign'), '</button>',
       '<button class="smart-ecg-button" type="button" title="Menu" aria-label="Menu">', icon('menu'), '</button>',
       '</div>',
       '</div>',
@@ -1064,10 +1062,6 @@
       '<div class="smart-ecg-interpretation" id="ecg-interpretation"></div>',
       '</div>',
       '</aside>',
-      '</div>',
-      '<div class="smart-ecg-floating-actions">',
-      '<button class="smart-ecg-floating-button" id="smart-ecg-floating-save" type="button" title="Save ECG" aria-label="Save ECG">Save</button>',
-      '<button class="smart-ecg-floating-button smart-ecg-floating-sign" id="smart-ecg-floating-sign" type="button" title="Sign ECG" aria-label="Sign ECG">Sign</button>',
       '</div>',
       '<div class="smart-ecg-event-monitor" id="smart-ecg-event-monitor" aria-live="polite">',
       '<strong>Event monitor</strong>',
@@ -1485,9 +1479,7 @@
     var printButton = byId('smart-ecg-print');
     var editButton = byId('smart-ecg-edit');
     var saveButton = byId('smart-ecg-save');
-    var floatingSaveButton = byId('smart-ecg-floating-save');
     var signButton = byId('smart-ecg-sign');
-    var floatingSignButton = byId('smart-ecg-floating-sign');
     var closeButton = byId('smart-ecg-close');
     var detailsPanel = document.querySelector ? document.querySelector('.smart-ecg-details') : null;
 
@@ -1522,35 +1514,9 @@
       };
     }
 
-    if (floatingSaveButton) {
-      floatingSaveButton.onclick = function() {
-        logTroubleshooting('floating save button clicked', {
-          studyId: getCurrentStudyId()
-        });
-        if (saveEcg('Saved')) {
-          clearPendingData();
-          sendCardiologyViewerEvent('STUDY_COMPLETED', '');
-        }
-      };
-    }
-
     if (signButton) {
       signButton.onclick = function() {
         logTroubleshooting('top sign button clicked', {
-          studyId: getCurrentStudyId()
-        });
-        if (saveEcg('Signed')) {
-          clearPendingData();
-          sendCardiologyViewerEvent('STUDY_COMPLETED', '');
-          setEditMode(false);
-          setSourceStatus('Signed');
-        }
-      };
-    }
-
-    if (floatingSignButton) {
-      floatingSignButton.onclick = function() {
-        logTroubleshooting('floating sign button clicked', {
           studyId: getCurrentStudyId()
         });
         if (saveEcg('Signed')) {
