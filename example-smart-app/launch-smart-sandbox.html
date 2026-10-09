@@ -68,6 +68,8 @@
           );
         }
 
+        var studyIdFound = false;
+
         for (var i = 0; i < names.length; i += 1) {
           var value = getParam(names[i]);
           if (value) {
@@ -75,7 +77,15 @@
               sessionStorage.setItem('smart_ecg_study_id', value);
             } catch (e) {
             }
+            studyIdFound = true;
             break;
+          }
+        }
+
+        if (!studyIdFound) {
+          try {
+            sessionStorage.removeItem('smart_ecg_study_id');
+          } catch (e) {
           }
         }
 
@@ -91,8 +101,8 @@
         FHIR.oauth2.authorize({
           clientId: 'b7ce065d-3dae-4520-83b7-935d42e68a09',
           client_id: 'b7ce065d-3dae-4520-83b7-935d42e68a09',
-          redirectUri: './index.html',
-          redirect_uri: './index.html',
+          redirectUri: 'https://sunilm1989.github.io/smart-on-fhir-tutorial/example-smart-app/index.html',
+          redirect_uri: 'https://sunilm1989.github.io/smart-on-fhir-tutorial/example-smart-app/index.html',
           scope: 'launch openid fhirUser patient/Patient.read patient/Observation.read patient/DiagnosticReport.read patient/ImagingStudy.read patient/DocumentReference.read'
         });
       }
