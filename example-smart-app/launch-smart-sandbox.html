@@ -30,23 +30,6 @@
       var SI02_FHIR_HOST = 'si02-fhir-ohehr-l1-adapters-dev-axkbv4jfb37h-px-pp.integration.us-phoenix-1.ocp.oraclecloud.com';
 
       var shouldAuthorize = (function() {
-        var names = [
-          'studyId',
-          'studyID',
-          'study_id',
-          'studyIdentifier',
-          'study_identifier',
-          'cerner_accession',
-          'cerner_studyIdentifier',
-          'cerner_study_identifier',
-          '__accession',
-          '__studyIdentifier',
-          '__study_identifier',
-          'accession',
-          'accessionNumber',
-          'accession_number'
-        ];
-
         function getParam(name) {
           var query = window.location.search ? window.location.search.substring(1) : '';
           var pairs = query ? query.split('&') : [];
@@ -56,6 +39,33 @@
           for (i = 0; i < pairs.length; i += 1) {
             parts = pairs[i].split('=');
             if (decodeURIComponent(parts[0] || '').toLowerCase() === name.toLowerCase()) {
+              return decodeURIComponent((parts[1] || '').replace(/\+/g, ' '));
+            }
+          }
+
+          return '';
+        }
+
+        function normalizeLaunchContextKey(name) {
+          return String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        }
+
+        function isStudyContextParam(name) {
+          var key = normalizeLaunchContextKey(name);
+          return key.indexOf('accession') > -1 ||
+            key === 'studyid' ||
+            key.indexOf('studyidentifier') > -1;
+        }
+
+        function getStudyContextParam() {
+          var query = window.location.search ? window.location.search.substring(1) : '';
+          var pairs = query ? query.split('&') : [];
+          var i;
+          var parts;
+
+          for (i = 0; i < pairs.length; i += 1) {
+            parts = pairs[i].split('=');
+            if (isStudyContextParam(decodeURIComponent(parts[0] || ''))) {
               return decodeURIComponent((parts[1] || '').replace(/\+/g, ' '));
             }
           }
@@ -73,21 +83,13 @@
           );
         }
 
-        var studyIdFound = false;
-
-        for (var i = 0; i < names.length; i += 1) {
-          var value = getParam(names[i]);
-          if (value) {
-            try {
-              sessionStorage.setItem('smart_ecg_study_id', value);
-            } catch (e) {
-            }
-            studyIdFound = true;
-            break;
+        var studyIdValue = getStudyContextParam();
+        if (studyIdValue) {
+          try {
+            sessionStorage.setItem('smart_ecg_study_id', studyIdValue);
+          } catch (e) {
           }
-        }
-
-        if (!studyIdFound) {
+        } else {
           try {
             sessionStorage.removeItem('smart_ecg_study_id');
           } catch (e) {
