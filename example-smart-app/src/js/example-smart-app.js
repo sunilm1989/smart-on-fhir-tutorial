@@ -9,6 +9,7 @@
   var SHOW_EVENT_ALERTS = false;
   var currentStudyId = '';
   var dirtyDataSent = false;
+  var patientDirectoryByMrn = null;
   var ECG_INTERPRETATION_SUGGESTIONS = [
     'NORMAL SINUS RHYTHM',
     'SINUS RHYTHM',
@@ -308,6 +309,48 @@
     }
 
     return '';
+  }
+
+  function normalizeMrn(value) {
+    return String(value === undefined || value === null ? '' : value)
+      .replace(/^\s+|\s+$/g, '')
+      .toUpperCase();
+  }
+
+  function getPatientDirectoryRecords() {
+    var records = window.SMART_ECG_PATIENT_DIRECTORY;
+    if (Object.prototype.toString.call(records) === '[object Array]') {
+      return records;
+    }
+
+    return [];
+  }
+
+  function getPatientDirectoryMap() {
+    var records;
+    var i;
+    var key;
+
+    if (patientDirectoryByMrn) {
+      return patientDirectoryByMrn;
+    }
+
+    patientDirectoryByMrn = {};
+    records = getPatientDirectoryRecords();
+
+    for (i = 0; i < records.length; i += 1) {
+      key = normalizeMrn(records[i].mrn);
+      if (key && !patientDirectoryByMrn[key]) {
+        patientDirectoryByMrn[key] = records[i];
+      }
+    }
+
+    return patientDirectoryByMrn;
+  }
+
+  function findDirectoryPatient(mrn) {
+    var key = normalizeMrn(mrn);
+    return key ? getPatientDirectoryMap()[key] || null : null;
   }
 
   function getQueryParam(name) {
@@ -664,6 +707,7 @@
     var name = getPatientName(patient);
     var contextPatientId = studyContext && studyContext.patientId ? studyContext.patientId : '';
     var patientId = contextPatientId || getPrimaryIdentifier(patient);
+    var directoryPatient = findDirectoryPatient(patientId);
     var height = getQuantityValueAndUnit(findObservation(observations, '8302-2'));
     var hdl = getQuantityValueAndUnit(findObservation(observations, '2085-9'));
     var ldl = getQuantityValueAndUnit(findObservation(observations, '2089-1'));
@@ -672,8 +716,8 @@
     var studyId = studyContext && studyContext.studyId ? studyContext.studyId : '';
 
     return {
-      fname: name.first || fallback.fname,
-      lname: name.last || fallback.lname,
+      fname: directoryPatient && directoryPatient.firstName ? directoryPatient.firstName : (name.first || fallback.fname),
+      lname: directoryPatient && directoryPatient.lastName ? directoryPatient.lastName : (name.last || fallback.lname),
       gender: capitalize(patient && patient.gender),
       birthdate: patient && patient.birthDate ? patient.birthDate : fallback.birthdate,
       patientId: patientId || fallback.patientId,
@@ -900,28 +944,18 @@
     return ret.promise();
   }
 
-  function isFallbackName(patientData) {
-    return !patientData ||
-      ((patientData.fname || '') === 'Patient' && (patientData.lname || '') === 'Demo');
-  }
-
   function studyMatchPatientData(patientData, smart) {
     var fallback = defaultPatient();
-    var patientId = getLaunchPatientId(smart) ||
-      (patientData && patientData.patientId) ||
+    var patientId = (patientData && patientData.patientId) ||
+      getLaunchPatientId(smart) ||
       fallback.patientId;
+    var directoryPatient = findDirectoryPatient(patientId);
     var data = {
-      fname: patientData && patientData.fname ? patientData.fname : fallback.fname,
-      lname: patientData && patientData.lname ? patientData.lname : fallback.lname,
+      fname: directoryPatient && directoryPatient.firstName ? directoryPatient.firstName : (patientData && patientData.fname ? patientData.fname : fallback.fname),
+      lname: directoryPatient && directoryPatient.lastName ? directoryPatient.lastName : (patientData && patientData.lname ? patientData.lname : fallback.lname),
       birthdate: patientData && patientData.birthdate ? patientData.birthdate : fallback.birthdate,
-      patientId: patientId
+      patientId: directoryPatient && directoryPatient.mrn ? directoryPatient.mrn : patientId
     };
-
-    if (patientId === '72423' && isFallbackName(data)) {
-      data.fname = 'Paul';
-      data.lname = 'Jhon';
-      data.birthdate = '1989-04-05';
-    }
 
     return data;
   }
@@ -1038,9 +1072,15 @@
   function applyLaunchIdentifiers(data, smart) {
     var patientId = getLaunchPatientId(smart);
     var studyId = getStudyId(smart);
+    var directoryPatient;
 
     if (patientId) {
       data.patientId = patientId;
+      directoryPatient = findDirectoryPatient(patientId);
+      if (directoryPatient) {
+        data.fname = directoryPatient.firstName || data.fname;
+        data.lname = directoryPatient.lastName || data.lname;
+      }
     }
 
     if (studyId) {
@@ -1234,7 +1274,8 @@
       '.study-match-filter { min-height: 2.7rem; padding: .08rem .2rem .32rem .55rem; border-bottom: 1px solid #b8bec6; }',
       '.study-match-filter-label { display: block; color: #808995; font-size: .68rem; font-weight: 800; }',
       '.study-match-filter-value { display: flex; align-items: center; justify-content: space-between; gap: .35rem; margin-top: .15rem; color: #3a4652; font-size: .82rem; font-weight: 800; }',
-      '.study-match-clear { color: #858d97; font-size: 1.1rem; line-height: 1; }',
+      '.study-match-search-input { flex: 1 1 auto; min-width: 0; padding: 0; color: #3a4652; background: transparent; border: 0; outline: none; font: inherit; font-weight: 800; }',
+      '.study-match-clear { padding: 0; color: #858d97; background: transparent; border: 0; font-size: 1.1rem; line-height: 1; }',
       '.study-match-section-label { margin: 1rem 0 .8rem; color: #333d49; font-size: .78rem; font-weight: 800; }',
       '.study-match-date-field { display: flex; align-items: center; justify-content: space-between; height: 3.1rem; padding: 0 .25rem 0 .55rem; color: #8b939d; border-bottom: 1px solid #b8bec6; font-size: .84rem; }',
       '.study-match-side-button { width: 100%; height: 1.9rem; margin-top: .9rem; color: #fff; background: #005a9f; border: 0; border-radius: 3px; box-shadow: 0 1px 3px rgba(0,0,0,.25); font-size: .75rem; font-weight: 800; letter-spacing: .04em; }',
@@ -1456,11 +1497,11 @@
       '<div class="study-match-filter"><span class="study-match-filter-label">Site</span><span class="study-match-filter-value">Baseline West Medic...<span>v</span></span></div>',
       '<div class="study-match-filter"><span class="study-match-filter-label">Type</span><span class="study-match-filter-value">ECG<span>v</span></span></div>',
       '<div class="study-match-filter"><span class="study-match-filter-label">Search By</span><span class="study-match-filter-value">Pat ID<span>v</span></span></div>',
-      '<div class="study-match-filter"><span class="study-match-filter-label">Search</span><span class="study-match-filter-value">', escapeHtml(context.patientId), '<span class="study-match-clear">x</span></span></div>',
+      '<div class="study-match-filter"><label class="study-match-filter-label" for="study-match-patient-search">Search</label><span class="study-match-filter-value"><input class="study-match-search-input" id="study-match-patient-search" type="text" value="', escapeHtml(context.patientId), '"><button class="study-match-clear" type="button" data-study-search-action="clear" aria-label="Clear patient search">x</button></span></div>',
       '<div class="study-match-section-label">Date Performed</div>',
       '<div class="study-match-date-field"><span>Start Date</span><span>[]</span></div>',
       '<div class="study-match-date-field"><span>End Date</span><span>[]</span></div>',
-      '<button class="study-match-side-button" type="button">SEARCH</button>',
+      '<button class="study-match-side-button" type="button" data-study-search-action="search">SEARCH</button>',
       '<button class="study-match-side-button secondary" type="button">SAVE DEFAULTS</button>',
       '</aside>'
     ].join('');
@@ -1685,6 +1726,13 @@
   }
 
   function renderPatient(data) {
+    var directoryPatient = findDirectoryPatient(data.patientId);
+
+    if (directoryPatient) {
+      data.fname = directoryPatient.firstName || data.fname;
+      data.lname = directoryPatient.lastName || data.lname;
+    }
+
     setCurrentStudyId(data.accession || getStudyId() || data.patientId);
     setSourceStatus(data.sourceStatus);
     setText('ecg-first-name', data.fname);
@@ -2354,15 +2402,36 @@
     closeStudyMatchReconcile();
   }
 
+  function searchStudyMatchByPatientId(patientId) {
+    var value = String(patientId || '').replace(/^\s+|\s+$/g, '');
+    if (!value) {
+      return;
+    }
+
+    drawStudyMatchWorkflow(buildStudyMatchContext({
+      patientId: value
+    }, null));
+  }
+
   function attachStudyMatchActions(context) {
     var app = byId('study-match-app');
+    var searchInput = byId('study-match-patient-search');
 
     if (!app) {
       return;
     }
 
+    if (searchInput && typeof searchInput.addEventListener === 'function') {
+      searchInput.addEventListener('keydown', function(event) {
+        if ((event.key && event.key === 'Enter') || event.keyCode === 13) {
+          searchStudyMatchByPatientId(searchInput.value);
+        }
+      });
+    }
+
     app.onclick = function(event) {
       var target = event.target || event.srcElement;
+      var searchAction = findActionTarget(target, 'data-study-search-action');
       var rowAction = findActionTarget(target, 'data-study-action');
       var menuAction = findActionTarget(target, 'data-menu-action');
       var dialogAction = findActionTarget(target, 'data-dialog-action');
@@ -2370,6 +2439,23 @@
       var menu = byId('study-match-menu');
       var studyIndex;
       var orderIndex;
+
+      if (searchAction) {
+        if (searchAction.getAttribute('data-study-search-action') === 'clear') {
+          if (searchInput) {
+            searchInput.value = '';
+            if (typeof searchInput.focus === 'function') {
+              searchInput.focus();
+            }
+          }
+          return;
+        }
+
+        if (searchInput) {
+          searchStudyMatchByPatientId(searchInput.value);
+        }
+        return;
+      }
 
       if (rowAction) {
         studyIndex = parseInt(rowAction.getAttribute('data-study-index'), 10) || 0;
