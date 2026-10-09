@@ -5,6 +5,9 @@
   var WIDTH = 1200;
   var HEIGHT = 680;
   var STYLE_ID = 'smart-ecg-styles';
+  var EVENT_NAME = 'CARDIOLOGY_VIEWER_EVENT';
+  var currentStudyId = '';
+  var dirtyDataSent = false;
 
   var LEADS = [
     { name: 'I', row: 0, col: 0, p: 0.13, q: -0.11, r: 0.95, s: -0.28, t: 0.34, gain: 1, seed: 1 },
@@ -221,6 +224,62 @@
       getQueryParam('accession_number') ||
       safeSessionItem('smart_ecg_study_id') ||
       '';
+  }
+
+  function setCurrentStudyId(studyId) {
+    currentStudyId = studyId || '';
+  }
+
+  function getCurrentStudyId() {
+    return currentStudyId ||
+      getUiText('ecg-accession') ||
+      getStudyId() ||
+      getUiText('ecg-patient-id') ||
+      'UNKNOWN_STUDY';
+  }
+
+  function createEventDetail(action, studyId, data) {
+    return {
+      action: action,
+      context: {
+        studyId: studyId,
+        data: data
+      }
+    };
+  }
+
+  function sendCardiologyViewerEvent(action, data) {
+    var detail = createEventDetail(action, getCurrentStudyId(), data === undefined ? '' : data);
+    var payload = {
+      type: EVENT_NAME,
+      detail: detail
+    };
+    var event;
+
+    try {
+      event = new window.CustomEvent(EVENT_NAME, { detail: detail });
+      window.dispatchEvent(event);
+    } catch (e) {
+      if (document.createEvent) {
+        event = document.createEvent('CustomEvent');
+        event.initCustomEvent(EVENT_NAME, false, false, detail);
+        window.dispatchEvent(event);
+      }
+    }
+
+    try {
+      if (window.parent && window.parent !== window && typeof window.parent.postMessage === 'function') {
+        window.parent.postMessage(payload, '*');
+      }
+    } catch (postMessageError) {
+      if (window.console && typeof window.console.log === 'function') {
+        window.console.log('Unable to post cardiology viewer event', postMessageError);
+      }
+    }
+
+    if (window.console && typeof window.console.log === 'function') {
+      window.console.log(EVENT_NAME, detail);
+    }
   }
 
   function hasSmartContext() {
@@ -797,6 +856,7 @@
       '.smart-ecg-toolbar { display: flex; align-items: center; gap: .18rem; padding: .18rem .35rem; background: #fff; border-bottom: 1px solid #d3d8df; }',
       '.smart-ecg-button { display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; padding: 0; color: #1f2d3d; background: #fff; border: 1px solid transparent; border-radius: 4px; font: inherit; cursor: default; }',
       '.smart-ecg-button:hover { background: #edf2f9; border-color: #c9d3e2; }',
+      '.smart-ecg-close-button { color: #0d45bf; border-color: #c9d3e2; }',
       '.smart-ecg-toolbar-spacer { flex: 1 1 auto; }',
       '.smart-ecg-scale { color: #0d45bf; font-size: .9rem; font-weight: 800; }',
       '.smart-ecg-stage { position: relative; min-width: 0; overflow: hidden; background-color: #fff9f8; background-image: linear-gradient(rgba(230,73,73,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(230,73,73,.18) 1px, transparent 1px), linear-gradient(rgba(210,48,48,.35) 2px, transparent 2px), linear-gradient(90deg, rgba(210,48,48,.35) 2px, transparent 2px); background-size: 8px 8px, 8px 8px, 40px 40px, 40px 40px; }',
@@ -813,7 +873,7 @@
       '.smart-ecg-command { width: auto; min-width: 4rem; padding: 0 .65rem; gap: .3rem; color: #fff; border-color: rgba(255,255,255,.22); font-size: .76rem; font-weight: 800; }',
       '.smart-ecg-command.smart-ecg-sign { background: rgba(37, 111, 58, .9); }',
       '.smart-ecg-command.smart-ecg-save-action { background: rgba(255,255,255,.12); }',
-      'body.smart-ecg-editing .smart-ecg-interpretation { outline: 2px solid #88b7ff; background: #fff; }',
+      'body.smart-ecg-editing .smart-ecg-field-value, body.smart-ecg-editing .smart-ecg-cell-value, body.smart-ecg-editing .smart-ecg-interpretation { outline: 2px solid #88b7ff; background: #fff; }',
       '.smart-ecg-patient-grid { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 0; padding: .75rem .65rem .55rem; background: #fff; border-bottom: 1px solid #d4d9e1; }',
       '.smart-ecg-field { min-width: 0; min-height: 2.35rem; padding: 0 .48rem; border-right: 1px solid #e0e4ea; }',
       '.smart-ecg-field:last-child { border-right: 0; }',
@@ -928,6 +988,7 @@
       '<button class="smart-ecg-button" type="button" title="Full screen" aria-label="Full screen">', icon('fullscreen'), '</button>',
       '<div class="smart-ecg-toolbar-spacer"></div>',
       '<span class="smart-ecg-scale">10mm/mV</span>',
+      '<button class="smart-ecg-button smart-ecg-close-button" id="smart-ecg-close" type="button" title="Close viewer" aria-label="Close viewer">X</button>',
       '</div>',
       '<div class="smart-ecg-stage">',
       '<svg id="smart-ecg-chart" class="smart-ecg-svg" viewBox="0 0 1200 680" preserveAspectRatio="none" role="img" aria-label="Twelve lead ECG waveform"></svg>',
@@ -1058,6 +1119,7 @@
   }
 
   function renderPatient(data) {
+    setCurrentStudyId(data.accession || getStudyId() || data.patientId);
     setText('ecg-source-status', data.sourceStatus || 'Unconfirmed');
     setText('ecg-first-name', data.fname);
     setText('ecg-last-name', data.lname);
@@ -1249,13 +1311,15 @@
   }
 
   function setEditMode(enabled) {
-    var interpretation = byId('ecg-interpretation');
+    var editableNodes = getEditableDetailNodes();
     var editButton = byId('smart-ecg-edit');
+    var i;
 
-    if (interpretation) {
-      interpretation.contentEditable = enabled ? 'true' : 'false';
-      if (enabled && typeof interpretation.focus === 'function') {
-        interpretation.focus();
+    for (i = 0; i < editableNodes.length; i += 1) {
+      editableNodes[i].contentEditable = enabled ? 'true' : 'false';
+      editableNodes[i].setAttribute('aria-readonly', enabled ? 'false' : 'true');
+      if (enabled && i === 0 && typeof editableNodes[i].focus === 'function') {
+        editableNodes[i].focus();
       }
     }
 
@@ -1270,6 +1334,37 @@
       editButton.setAttribute('aria-pressed', enabled ? 'true' : 'false');
       editButton.title = enabled ? 'Stop editing' : 'Edit interpretation';
     }
+  }
+
+  function getEditableDetailNodes() {
+    if (!document.querySelectorAll) {
+      return [];
+    }
+
+    return document.querySelectorAll(
+      '.smart-ecg-details .smart-ecg-field-value, ' +
+      '.smart-ecg-details .smart-ecg-cell-value, ' +
+      '.smart-ecg-details .smart-ecg-interpretation'
+    );
+  }
+
+  function markPendingData() {
+    if (dirtyDataSent) {
+      return;
+    }
+
+    dirtyDataSent = true;
+    setSourceStatus('Pending data');
+    sendCardiologyViewerEvent('PENDING_DATA', true);
+  }
+
+  function clearPendingData() {
+    if (!dirtyDataSent) {
+      return;
+    }
+
+    dirtyDataSent = false;
+    sendCardiologyViewerEvent('PENDING_DATA', false);
   }
 
   function currentEcgPayload(status) {
@@ -1314,6 +1409,8 @@
     var floatingSaveButton = byId('smart-ecg-floating-save');
     var signButton = byId('smart-ecg-sign');
     var floatingSignButton = byId('smart-ecg-floating-sign');
+    var closeButton = byId('smart-ecg-close');
+    var detailsPanel = document.querySelector ? document.querySelector('.smart-ecg-details') : null;
 
     if (printButton) {
       printButton.onclick = function() {
@@ -1329,19 +1426,27 @@
 
     if (saveButton) {
       saveButton.onclick = function() {
-        saveEcg('Saved');
+        if (saveEcg('Saved')) {
+          clearPendingData();
+          sendCardiologyViewerEvent('STUDY_COMPLETED', '');
+        }
       };
     }
 
     if (floatingSaveButton) {
       floatingSaveButton.onclick = function() {
-        saveEcg('Saved');
+        if (saveEcg('Saved')) {
+          clearPendingData();
+          sendCardiologyViewerEvent('STUDY_COMPLETED', '');
+        }
       };
     }
 
     if (signButton) {
       signButton.onclick = function() {
         if (saveEcg('Signed')) {
+          clearPendingData();
+          sendCardiologyViewerEvent('STUDY_COMPLETED', '');
           setEditMode(false);
           setSourceStatus('Signed');
         }
@@ -1351,10 +1456,23 @@
     if (floatingSignButton) {
       floatingSignButton.onclick = function() {
         if (saveEcg('Signed')) {
+          clearPendingData();
+          sendCardiologyViewerEvent('STUDY_COMPLETED', '');
           setEditMode(false);
           setSourceStatus('Signed');
         }
       };
+    }
+
+    if (closeButton) {
+      closeButton.onclick = function() {
+        sendCardiologyViewerEvent('VIEWER_CLOSE', '');
+      };
+    }
+
+    if (detailsPanel && typeof detailsPanel.addEventListener === 'function') {
+      detailsPanel.addEventListener('input', markPendingData);
+      detailsPanel.addEventListener('change', markPendingData);
     }
   }
 
