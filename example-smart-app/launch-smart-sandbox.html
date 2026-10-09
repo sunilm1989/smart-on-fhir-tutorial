@@ -24,7 +24,7 @@
     <!-- Currently, the SMART App Launcher (https://launch.smarthealthit.org) does not check/validate the client_id field.
         If/when this changes, or when working with other authorization servers, please update the client_id field here. -->
     <script>
-      (function() {
+      var shouldAuthorize = (function() {
         var names = [
           'studyId',
           'studyID',
@@ -58,6 +58,16 @@
           return '';
         }
 
+        function hasSmartLaunchContext() {
+          return !!(
+            getParam('iss') ||
+            getParam('launch') ||
+            getParam('fhirServiceUrl') ||
+            getParam('code') ||
+            getParam('state')
+          );
+        }
+
         for (var i = 0; i < names.length; i += 1) {
           var value = getParam(names[i]);
           if (value) {
@@ -68,15 +78,24 @@
             break;
           }
         }
+
+        if (!hasSmartLaunchContext()) {
+          window.location.replace('./index.html' + window.location.search + window.location.hash);
+          return false;
+        }
+
+        return true;
       })();
 
-      FHIR.oauth2.authorize({
-        clientId: 'b7ce065d-3dae-4520-83b7-935d42e68a09',
-        client_id: 'b7ce065d-3dae-4520-83b7-935d42e68a09',
-        redirectUri: './index.html',
-        redirect_uri: './index.html',
-        scope: 'launch openid fhirUser patient/Patient.read patient/Observation.read patient/DiagnosticReport.read patient/ImagingStudy.read patient/DocumentReference.read'
-      });
+      if (shouldAuthorize) {
+        FHIR.oauth2.authorize({
+          clientId: 'b7ce065d-3dae-4520-83b7-935d42e68a09',
+          client_id: 'b7ce065d-3dae-4520-83b7-935d42e68a09',
+          redirectUri: './index.html',
+          redirect_uri: './index.html',
+          scope: 'launch openid fhirUser patient/Patient.read patient/Observation.read patient/DiagnosticReport.read patient/ImagingStudy.read patient/DocumentReference.read'
+        });
+      }
     </script>
     <div class="spinner">
       <div class="bounce1"></div>
