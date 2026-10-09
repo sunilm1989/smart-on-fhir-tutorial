@@ -6,7 +6,7 @@
   var HEIGHT = 680;
   var STYLE_ID = 'smart-ecg-styles';
   var EVENT_NAME = 'CARDIOLOGY_VIEWER_EVENT';
-  var SHOW_EVENT_ALERTS = true;
+  var SHOW_EVENT_ALERTS = false;
   var currentStudyId = '';
   var dirtyDataSent = false;
 
@@ -912,7 +912,7 @@
       '.smart-ecg-cell-label { display: block; margin-bottom: .3rem; color: #8993a1; font-size: .76rem; font-weight: 800; }',
       '.smart-ecg-cell-value { display: block; overflow-wrap: anywhere; color: #202833; font-size: .8rem; font-weight: 800; }',
       '.smart-ecg-interpretation { padding: .75rem .78rem 1.2rem; font-size: .78rem; font-weight: 800; line-height: 1.45; white-space: pre-line; }',
-      '.smart-ecg-event-monitor { position: fixed; left: 1rem; bottom: 1.15rem; z-index: 50; min-width: 18rem; max-width: min(32rem, calc(100vw - 2rem)); padding: .65rem .8rem; color: #10213a; background: #fff; border: 1px solid #88b7ff; border-left: 5px solid #0d45bf; border-radius: 4px; box-shadow: 0 .35rem 1rem rgba(21,49,91,.18); font-size: .78rem; line-height: 1.35; }',
+      '.smart-ecg-event-monitor { position: fixed; right: 1rem; bottom: 1.15rem; z-index: 50; min-width: 18rem; max-width: min(32rem, calc(100vw - 2rem)); padding: .65rem .8rem; color: #10213a; background: #fff; border: 1px solid #88b7ff; border-left: 5px solid #0d45bf; border-radius: 4px; box-shadow: 0 .35rem 1rem rgba(21,49,91,.18); font-size: .78rem; line-height: 1.35; }',
       '.smart-ecg-event-monitor strong { display: block; margin-bottom: .2rem; color: #0d45bf; font-size: .78rem; }',
       '.smart-ecg-event-monitor code { font-family: Menlo, Consolas, monospace; font-size: .74rem; }',
       '@media (max-width: 1100px) { body.smart-ecg-body { overflow: auto; } .smart-ecg-app { grid-template-columns: 1fr; height: auto; min-height: 100vh; } .smart-ecg-viewer { min-height: 680px; border-right: 0; border-bottom: 1px solid #9aa5b4; } .smart-ecg-details { grid-template-rows: 2.75rem auto auto; } }',
