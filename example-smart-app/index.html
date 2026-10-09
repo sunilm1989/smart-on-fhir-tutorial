@@ -1,102 +1,1158 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta http-equiv='X-UA-Compatible' content='IE=edge' />
-    <meta http-equiv='Content-Type' content='text/html; charset=utf-8' />
-    <meta http-equiv="Permissions-Policy" content="interest-cohort=()">
-    <title>sunilm1989 Example-SMART-App</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv="Permissions-Policy" content="interest-cohort=()" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SMART ECG Viewer</title>
+    <style>
+      :root {
+        --blue: #254f9f;
+        --blue-strong: #0d45bf;
+        --line: #b8c0cc;
+        --line-dark: #8c97a6;
+        --paper-small: rgba(230, 73, 73, 0.18);
+        --paper-large: rgba(210, 48, 48, 0.35);
+        --text: #202833;
+        --muted: #627084;
+        --panel: #f6f8fb;
+        --panel-head: #d6d9de;
+      }
 
-    <link rel='stylesheet' type='text/css' href='./src/css/example-smart-app.css'>
-    <!--
-      Temporarily disable cerner-smart-embeddable-lib
-    <link rel='stylesheet' type='text/css' href='./lib/css/cerner-smart-embeddable-lib-1.0.0.min.css'>
-    -->
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        color: var(--text);
+        background: #eef1f5;
+        font-family: Arial, Helvetica, sans-serif;
+        overflow: hidden;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: minmax(680px, 1fr) 32rem;
+        height: 100vh;
+        min-height: 640px;
+        background: #fff;
+      }
+
+      .viewer {
+        display: grid;
+        grid-template-rows: 3rem 2.25rem minmax(0, 1fr);
+        min-width: 0;
+        border-right: 1px solid #9aa5b4;
+      }
+
+      .metric-strip {
+        display: flex;
+        align-items: stretch;
+        min-width: 0;
+        background: #f4f6f8;
+        border-bottom: 1px solid #ccd2da;
+      }
+
+      .metric {
+        min-width: 4.5rem;
+        padding: 0.34rem 0.45rem;
+        border-right: 1px solid #d9dee5;
+        line-height: 1.05;
+      }
+
+      .metric .label {
+        display: block;
+        color: #5f6b7a;
+        font-size: 0.7rem;
+        font-weight: 700;
+      }
+
+      .metric .value {
+        display: block;
+        margin-top: 0.12rem;
+        font-size: 0.86rem;
+        font-weight: 800;
+      }
+
+      .metric.severity {
+        min-width: 7.25rem;
+        background: #eef1f5;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 0.18rem;
+        padding: 0.18rem 0.35rem;
+        background: #fff;
+        border-bottom: 1px solid #d3d8df;
+      }
+
+      .tool-button,
+      .action-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.75rem;
+        height: 1.75rem;
+        padding: 0;
+        color: #1f2d3d;
+        background: #fff;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        cursor: default;
+      }
+
+      .tool-button:hover,
+      .action-button:hover {
+        background: #edf2f9;
+        border-color: #c9d3e2;
+      }
+
+      .toolbar-spacer {
+        flex: 1 1 auto;
+      }
+
+      .scale-label {
+        color: var(--blue-strong);
+        font-weight: 800;
+        font-size: 0.9rem;
+      }
+
+      .ecg-stage {
+        position: relative;
+        min-width: 0;
+        overflow: hidden;
+        background-color: #fff9f8;
+        background-image:
+          linear-gradient(var(--paper-small) 1px, transparent 1px),
+          linear-gradient(90deg, var(--paper-small) 1px, transparent 1px),
+          linear-gradient(var(--paper-large) 2px, transparent 2px),
+          linear-gradient(90deg, var(--paper-large) 2px, transparent 2px);
+        background-size: 8px 8px, 8px 8px, 40px 40px, 40px 40px;
+      }
+
+      .ecg-svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .ecg-line {
+        fill: none;
+        stroke: #24292f;
+        stroke-width: 1.75;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .lead-label,
+      .paper-caption {
+        fill: var(--blue-strong);
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .lead-marker,
+      .calibration {
+        fill: none;
+        stroke: var(--blue-strong);
+        stroke-width: 3;
+        stroke-linecap: square;
+        stroke-linejoin: miter;
+      }
+
+      .details {
+        display: grid;
+        grid-template-rows: 2.75rem auto minmax(0, 1fr);
+        min-width: 0;
+        background: #f7f8fa;
+      }
+
+      .details-top {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        padding: 0 0.5rem 0 1rem;
+        color: #fff;
+        background: var(--blue);
+      }
+
+      .details-title {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-align: center;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.95rem;
+        font-weight: 800;
+      }
+
+      .details-actions {
+        display: flex;
+        gap: 0.2rem;
+      }
+
+      .details-actions .action-button {
+        color: #fff;
+        background: transparent;
+      }
+
+      .details-actions .action-button:hover {
+        background: rgba(255, 255, 255, 0.14);
+        border-color: rgba(255, 255, 255, 0.22);
+      }
+
+      .patient-grid {
+        display: grid;
+        grid-template-columns: repeat(9, minmax(0, 1fr));
+        gap: 0;
+        padding: 0.75rem 0.65rem 0.55rem;
+        background: #fff;
+        border-bottom: 1px solid #d4d9e1;
+      }
+
+      .field {
+        min-width: 0;
+        min-height: 2.35rem;
+        padding: 0 0.48rem;
+        border-right: 1px solid #e0e4ea;
+      }
+
+      .field:last-child {
+        border-right: 0;
+      }
+
+      .field.span-2 {
+        grid-column: span 2;
+      }
+
+      .field .label {
+        display: block;
+        margin-bottom: 0.25rem;
+        overflow: hidden;
+        color: #818b98;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.74rem;
+        font-weight: 800;
+      }
+
+      .field .value {
+        display: block;
+        overflow-wrap: anywhere;
+        color: #222a35;
+        font-size: 0.78rem;
+        font-weight: 800;
+      }
+
+      .detail-scroll {
+        min-height: 0;
+        overflow: auto;
+        padding-bottom: 0.8rem;
+      }
+
+      .section-title {
+        display: flex;
+        align-items: center;
+        height: 1.38rem;
+        padding: 0 0.5rem;
+        color: #1e2b38;
+        background: var(--panel-head);
+        border-top: 1px solid #b5bcc7;
+        border-bottom: 1px solid #b5bcc7;
+        font-size: 0.82rem;
+        font-weight: 800;
+      }
+
+      .section-title svg {
+        margin-right: 0.28rem;
+      }
+
+      .data-box {
+        margin: 0.48rem 0.55rem;
+        background: #fff;
+        border: 1px solid #9da9b8;
+      }
+
+      .data-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+
+      .data-grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .data-grid.one {
+        grid-template-columns: 1fr;
+      }
+
+      .data-cell {
+        min-height: 2.85rem;
+        padding: 0.55rem 0.5rem;
+        border-right: 1px solid #e1e5eb;
+        border-bottom: 1px solid #e1e5eb;
+      }
+
+      .data-cell:last-child {
+        border-right: 0;
+      }
+
+      .data-cell .label {
+        display: block;
+        margin-bottom: 0.3rem;
+        color: #8993a1;
+        font-size: 0.76rem;
+        font-weight: 800;
+      }
+
+      .data-cell .value {
+        display: block;
+        overflow-wrap: anywhere;
+        color: #202833;
+        font-size: 0.8rem;
+        font-weight: 800;
+      }
+
+      .interpretation {
+        padding: 0.75rem 0.78rem 1.2rem;
+        font-size: 0.78rem;
+        font-weight: 800;
+        line-height: 1.45;
+        white-space: pre-line;
+      }
+
+      .floating-save {
+        position: fixed;
+        right: 1.1rem;
+        bottom: 1.15rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 3rem;
+        height: 3rem;
+        color: #0d2448;
+        background: #88b7ff;
+        border: 0;
+        border-radius: 50%;
+        box-shadow: 0 0.35rem 1rem rgba(21, 49, 91, 0.28);
+      }
+
+      .loading-cover {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: grid;
+        place-items: center;
+        background: rgba(247, 249, 252, 0.84);
+      }
+
+      body.is-ready .loading-cover {
+        display: none;
+      }
+
+      .spinner {
+        width: 4.5rem;
+        text-align: center;
+      }
+
+      .spinner > div {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        margin: 0 0.12rem;
+        background-color: var(--blue);
+        border-radius: 100%;
+        animation: sk-bouncedelay 1.4s infinite ease-in-out both;
+      }
+
+      .spinner .bounce1 {
+        animation-delay: -0.32s;
+      }
+
+      .spinner .bounce2 {
+        animation-delay: -0.16s;
+      }
+
+      @keyframes sk-bouncedelay {
+        0%,
+        80%,
+        100% {
+          transform: scale(0);
+        }
+
+        40% {
+          transform: scale(1);
+        }
+      }
+
+      @media (max-width: 1100px) {
+        body {
+          overflow: auto;
+        }
+
+        .app-shell {
+          grid-template-columns: 1fr;
+          height: auto;
+          min-height: 100vh;
+        }
+
+        .viewer {
+          min-height: 680px;
+          border-right: 0;
+          border-bottom: 1px solid #9aa5b4;
+        }
+
+        .details {
+          grid-template-rows: 2.75rem auto auto;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .metric-strip {
+          overflow-x: auto;
+        }
+
+        .viewer {
+          grid-template-rows: 3rem 2.25rem 560px;
+          min-height: 0;
+        }
+
+        .patient-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .field.span-2 {
+          grid-column: span 1;
+        }
+
+        .data-grid,
+        .data-grid.two {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .data-grid.one {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id='errors'>
+    <div class="app-shell">
+      <section class="viewer" aria-label="ECG waveform viewer">
+        <div class="metric-strip" aria-label="ECG measurements">
+          <div class="metric">
+            <span class="label">Rate</span>
+            <span class="value" id="rate">93</span>
+          </div>
+          <div class="metric">
+            <span class="label">PR</span>
+            <span class="value" id="pr">112</span>
+          </div>
+          <div class="metric">
+            <span class="label">QRSd</span>
+            <span class="value" id="qrsd">84</span>
+          </div>
+          <div class="metric">
+            <span class="label">QT</span>
+            <span class="value" id="qt">336</span>
+          </div>
+          <div class="metric">
+            <span class="label">QTc</span>
+            <span class="value" id="qtc">418</span>
+          </div>
+          <div class="metric">
+            <span class="label">P</span>
+            <span class="value" id="pAxis">13</span>
+          </div>
+          <div class="metric">
+            <span class="label">QRS</span>
+            <span class="value" id="qrsAxis">41</span>
+          </div>
+          <div class="metric">
+            <span class="label">T</span>
+            <span class="value" id="tAxis">6</span>
+          </div>
+          <div class="metric severity">
+            <span class="label">Severity</span>
+            <span class="value" id="severity">Abnormal ECG</span>
+          </div>
+        </div>
+
+        <div class="toolbar" aria-label="ECG toolbar">
+          <button class="tool-button" type="button" title="Previous tracing" aria-label="Previous tracing">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 16l6-8 6 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path d="M6 21l6-8 6 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </button>
+          <button class="tool-button" type="button" title="Measure" aria-label="Measure">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 3h10M7 21h10M12 4v16M9 8h6M9 16h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            </svg>
+          </button>
+          <button class="tool-button" type="button" title="Wave tools" aria-label="Wave tools">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 15h3l2-6 3 10 2-8 2 4h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path d="M4 20h16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="1 4"></path>
+            </svg>
+          </button>
+          <button class="tool-button" type="button" title="Filter" aria-label="Filter">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 5h16l-6 7v6l-4 2v-8z" fill="currentColor"></path>
+            </svg>
+          </button>
+          <button class="tool-button" type="button" title="Full screen" aria-label="Full screen">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            </svg>
+          </button>
+          <div class="toolbar-spacer"></div>
+          <span class="scale-label">10mm/mV</span>
+        </div>
+
+        <div class="ecg-stage">
+          <svg id="ecgChart" class="ecg-svg" viewBox="0 0 1200 680" preserveAspectRatio="none" role="img" aria-label="Twelve lead ECG waveform"></svg>
+        </div>
+      </section>
+
+      <aside class="details" aria-label="ECG details">
+        <div class="details-top">
+          <div class="details-title">Unconfirmed</div>
+          <div class="details-actions">
+            <button class="action-button" type="button" title="Copy link" aria-label="Copy link">
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M10 13a5 5 0 0 0 7.54.54l2-2a5 5 0 0 0-7.07-7.07l-1.15 1.15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-2 2a5 5 0 0 0 7.07 7.07l1.15-1.15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+              </svg>
+            </button>
+            <button class="action-button" type="button" title="Print" aria-label="Print">
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+              </svg>
+            </button>
+            <button class="action-button" type="button" title="Edit" aria-label="Edit">
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 20h4L19 9l-4-4L4 16v4zM13 7l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path>
+              </svg>
+            </button>
+            <button class="action-button" type="button" title="Menu" aria-label="Menu">
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="patient-grid">
+          <div class="field">
+            <span class="label">Last Name</span>
+            <span class="value" id="lastName">Demo</span>
+          </div>
+          <div class="field">
+            <span class="label">First Name</span>
+            <span class="value" id="firstName">Patient</span>
+          </div>
+          <div class="field">
+            <span class="label">Pat ID</span>
+            <span class="value" id="patientId">SMART</span>
+          </div>
+          <div class="field">
+            <span class="label">Age</span>
+            <span class="value" id="age">--</span>
+          </div>
+          <div class="field">
+            <span class="label">DOB</span>
+            <span class="value" id="dob">--</span>
+          </div>
+          <div class="field span-2">
+            <span class="label">Date-Time Performed</span>
+            <span class="value" id="performedAt">--</span>
+          </div>
+          <div class="field">
+            <span class="label">Gender</span>
+            <span class="value" id="gender">--</span>
+          </div>
+          <div class="field">
+            <span class="label">Race</span>
+            <span class="value" id="race">--</span>
+          </div>
+        </div>
+
+        <div class="detail-scroll">
+          <div class="section-title">
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M2 4l4 4 4-4z" fill="currentColor"></path>
+            </svg>
+            Visit
+          </div>
+          <div class="data-box">
+            <div class="data-grid">
+              <div class="data-cell">
+                <span class="label">Account #</span>
+                <span class="value" id="accountNumber">--</span>
+              </div>
+              <div class="data-cell">
+                <span class="label">Height</span>
+                <span class="value" id="height">--</span>
+              </div>
+              <div class="data-cell">
+                <span class="label">Weight</span>
+                <span class="value" id="weight">--</span>
+              </div>
+              <div class="data-cell">
+                <span class="label">RX</span>
+                <span class="value" id="rx">--</span>
+              </div>
+              <div class="data-cell">
+                <span class="label">Tech</span>
+                <span class="value" id="tech">--</span>
+              </div>
+              <div class="data-cell">
+                <span class="label">Site</span>
+                <span class="value" id="site">Cardiovascular</span>
+              </div>
+              <div class="data-cell">
+                <span class="label">Location</span>
+                <span class="value" id="location">SMART App</span>
+              </div>
+              <div class="data-cell">
+                <span class="label">Dept</span>
+                <span class="value" id="dept">--</span>
+              </div>
+              <div class="data-cell">
+                <span class="label">Room</span>
+                <span class="value" id="room">--</span>
+              </div>
+              <div class="data-cell">
+                <span class="label">DX</span>
+                <span class="value" id="dx">--</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="data-box">
+            <div class="data-grid two">
+              <div class="data-cell">
+                <span class="label">Reading Provider</span>
+                <span class="value" id="readingProvider">card doctor</span>
+              </div>
+              <div class="data-cell">
+                <span class="label">Fellow</span>
+                <span class="value" id="fellow">--</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="data-box">
+            <div class="data-grid one">
+              <div class="data-cell">
+                <span class="label">Accession</span>
+                <span class="value" id="accession">ECG-DEMO-0001</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-title">
+            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+              <path d="M2 4l4 4 4-4z" fill="currentColor"></path>
+            </svg>
+            Interpretation
+          </div>
+          <div class="interpretation" id="interpretation"></div>
+        </div>
+      </aside>
     </div>
-    <div id="loading" class="spinner">
-      <div class="bounce1"></div>
-      <div class="bounce2"></div>
-      <div class="bounce3"></div>
+
+    <button class="floating-save" type="button" title="Save ECG" aria-label="Save ECG">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 3h11l3 3v15H5z" fill="currentColor"></path>
+        <path d="M8 3v6h8V3M8 18h8v3H8z" fill="#f7fbff"></path>
+      </svg>
+    </button>
+
+    <div class="loading-cover" id="loading">
+      <div class="spinner" aria-label="Loading">
+        <div class="bounce1"></div>
+        <div class="bounce2"></div>
+        <div class="bounce3"></div>
+      </div>
     </div>
-    <div id='holder' >
-      <h2>sunilm1989 Example-SMART-App</h2>
 
-      <h2>Patient Resource</h2>
-      <table>
-        <tr>
-          <th>First Name:</th>
-          <td id='fname'></td>
-        </tr>
-        <tr>
-          <th>Last Name:</th>
-          <td id='lname'></td>
-        </tr>
-        <tr>
-          <th>Gender:</th>
-          <td id='gender'></td>
-        </tr>
-        <tr>
-          <th>Date of Birth:</th>
-          <td id='birthdate'></td>
-        </tr>
-      </table>
-      <h2>Observation Resource</h2>
-      <table>
-        <tr>
-          <th>Height:</th>
-          <td id='height'></td>
-        </tr>
-        <tr>
-          <th>Systolic Blood Pressure:</th>
-          <td id='systolicbp'></td>
-
-        </tr>
-        <tr>
-          <th>Diastolic Blood Pressure:</th>
-          <td id='diastolicbp'></td>
-        </tr>
-        <tr>
-          <th>LDL:</th>
-          <td id='ldl'></td>
-        </tr>
-        <tr>
-          <th>HDL:</th>
-          <td id='hdl'></td>
-        </tr>
-      </table>
-    </div>
-    <!-- Required JS files to enable this page to embed within an MPage -->
-    <!--
-      Temporarily disable cerner-smart-embeddable-lib
-      <script src='https://cdnjs.cloudflare.com/ajax/libs/babel-polyfill/6.26.0/polyfill.min.js'></script>
-      <script src='./lib/js/cerner-smart-embeddable-lib-1.0.0.min.js'></script>
-    -->
-
-    <!-- Application-level javascript-->
-    <script src='./src/js/example-smart-app.js'></script>
-
-    <!-- FHIR Client JS Library -->
-    <script src='./lib/js/fhir-client-v0.1.12.js'></script>
-
-    <!-- Prevent session bleed caused by single threaded embedded browser and sessionStorage API -->
-    <!-- https://github.com/cerner/fhir-client-cerner-additions -->
-    <script src='./lib/js/fhir-client-cerner-additions-1.0.0.js'></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <script src="./lib/js/fhir-client-v0.1.12.js"></script>
+    <script src="./lib/js/fhir-client-cerner-additions-1.0.0.js"></script>
     <script>
-      extractData().then(
-        //Display Patient Demographics and Observations if extractData was success
-        function(p) {
-          drawVisualization(p);
-        },
+      (function () {
+        "use strict";
 
-        //Display 'Failed to call FHIR Service' if extractData failed
-        function() {
-          $('#loading').hide();
-          $('#errors').html('<p> Failed to call FHIR Service </p>');
+        var SVG_NS = "http://www.w3.org/2000/svg";
+        var WIDTH = 1200;
+        var HEIGHT = 680;
+        var LEADS = [
+          { name: "I", row: 0, col: 0, p: 0.13, q: -0.11, r: 0.95, s: -0.28, t: 0.34, gain: 1, seed: 1 },
+          { name: "aVR", row: 0, col: 1, p: -0.08, q: 0.07, r: -0.75, s: 0.22, t: -0.22, gain: 1, seed: 2 },
+          { name: "V1", row: 0, col: 2, p: 0.05, q: -0.06, r: 0.25, s: -1.05, t: -0.07, gain: 1, seed: 3 },
+          { name: "V4", row: 0, col: 3, p: 0.1, q: -0.08, r: 0.82, s: -0.18, t: 0.24, gain: 1, seed: 4 },
+          { name: "II", row: 1, col: 0, p: 0.14, q: -0.12, r: 1.0, s: -0.3, t: 0.28, gain: 1, seed: 5 },
+          { name: "aVL", row: 1, col: 1, p: 0.05, q: -0.06, r: 0.32, s: -0.1, t: 0.12, gain: 1, seed: 6 },
+          { name: "V2", row: 1, col: 2, p: 0.07, q: -0.08, r: 0.44, s: -1.25, t: 0.12, gain: 1, seed: 7 },
+          { name: "V5", row: 1, col: 3, p: 0.12, q: -0.09, r: 0.95, s: -0.16, t: 0.24, gain: 1, seed: 8 },
+          { name: "III", row: 2, col: 0, p: -0.04, q: -0.04, r: 0.28, s: -0.16, t: -0.08, gain: 1, seed: 9 },
+          { name: "aVF", row: 2, col: 1, p: 0.08, q: -0.08, r: 0.66, s: -0.18, t: 0.12, gain: 1, seed: 10 },
+          { name: "V3", row: 2, col: 2, p: 0.09, q: -0.09, r: 0.62, s: -0.42, t: 0.18, gain: 1, seed: 11 },
+          { name: "V6", row: 2, col: 3, p: 0.1, q: -0.08, r: 0.86, s: -0.14, t: 0.22, gain: 1, seed: 12 }
+        ];
+
+        var RHYTHM = { name: "II", row: 3, col: 0, p: 0.14, q: -0.12, r: 1.0, s: -0.28, t: 0.28, gain: 1, seed: 13 };
+
+        function byId(id) {
+          return document.getElementById(id);
         }
-      );
+
+        function setText(id, value) {
+          var node = byId(id);
+          if (node) {
+            node.textContent = value || "--";
+          }
+        }
+
+        function addSvg(tag, attrs) {
+          var el = document.createElementNS(SVG_NS, tag);
+          Object.keys(attrs || {}).forEach(function (key) {
+            el.setAttribute(key, attrs[key]);
+          });
+          return el;
+        }
+
+        function gaussian(x, mean, width) {
+          var z = (x - mean) / width;
+          return Math.exp(-0.5 * z * z);
+        }
+
+        function waveformAt(phase, lead) {
+          return (
+            lead.p * gaussian(phase, 0.18, 0.035) +
+            lead.q * gaussian(phase, 0.37, 0.012) +
+            lead.r * gaussian(phase, 0.405, 0.009) +
+            lead.s * gaussian(phase, 0.435, 0.014) +
+            lead.t * gaussian(phase, 0.72, 0.075)
+          ) * lead.gain;
+        }
+
+        function makeTracePath(startX, endX, baseY, lead, beatPx, scale) {
+          var d = "";
+          var offset = (lead.seed * 11) % beatPx;
+
+          for (var x = startX; x <= endX; x += 1.75) {
+            var beatPosition = (x - startX + offset) % beatPx;
+            var phase = beatPosition / beatPx;
+            var drift = Math.sin((x + lead.seed * 17) * 0.031) * 1.25;
+            var fineNoise = Math.sin((x + lead.seed * 23) * 0.47) * 0.42;
+            var y = baseY - waveformAt(phase, lead) * scale + drift + fineNoise;
+            d += (x === startX ? "M" : "L") + x.toFixed(1) + " " + y.toFixed(1) + " ";
+          }
+
+          return d;
+        }
+
+        function drawLead(svg, lead) {
+          var rowBases = [96, 248, 400, 552];
+          var startX = 16 + lead.col * 292;
+          var endX = startX + 266;
+          var baseY = rowBases[lead.row];
+          var labelX = lead.col === 0 ? startX - 6 : startX + 10;
+          var markerX = startX - 5;
+
+          if (lead.col !== 0) {
+            svg.appendChild(addSvg("path", {
+              class: "lead-marker",
+              d: "M" + markerX + " " + (baseY - 42) + "V" + (baseY - 12) + "M" + markerX + " " + (baseY + 12) + "V" + (baseY + 42)
+            }));
+          }
+
+          svg.appendChild(addSvg("text", {
+            class: "lead-label",
+            x: labelX,
+            y: baseY - 38
+          })).textContent = lead.name;
+
+          svg.appendChild(addSvg("path", {
+            class: "ecg-line",
+            d: makeTracePath(startX, endX, baseY, lead, 74, 36)
+          }));
+        }
+
+        function drawCalibration(svg, y) {
+          svg.appendChild(addSvg("path", {
+            class: "calibration",
+            d: "M1164 " + y + "V" + (y - 42) + "H1186V" + y
+          }));
+        }
+
+        function drawEcgChart() {
+          var svg = byId("ecgChart");
+          if (!svg) {
+            return;
+          }
+
+          while (svg.firstChild) {
+            svg.removeChild(svg.firstChild);
+          }
+
+          svg.setAttribute("viewBox", "0 0 " + WIDTH + " " + HEIGHT);
+
+          LEADS.forEach(function (lead) {
+            drawLead(svg, lead);
+          });
+
+          svg.appendChild(addSvg("text", {
+            class: "lead-label",
+            x: 10,
+            y: 514
+          })).textContent = "II";
+
+          svg.appendChild(addSvg("path", {
+            class: "ecg-line",
+            d: makeTracePath(16, 1160, 552, RHYTHM, 74, 36)
+          }));
+
+          [96, 248, 400, 552].forEach(function (baseY) {
+            drawCalibration(svg, baseY);
+          });
+
+          svg.appendChild(addSvg("text", {
+            class: "paper-caption",
+            x: 8,
+            y: 666
+          })).textContent = "25mm/sec";
+
+          svg.appendChild(addSvg("text", {
+            class: "paper-caption",
+            x: 1092,
+            y: 666
+          })).textContent = "60 - 0.05 - 150 Hz";
+        }
+
+        function demoPatient() {
+          return {
+            firstName: "Patient",
+            lastName: "Demo",
+            patientId: "SMART",
+            gender: "Male",
+            birthDate: "1989-04-05",
+            race: "--",
+            accountNumber: "577590",
+            accession: "ECG-DEMO-0001",
+            height: "178 cm",
+            weight: "--",
+            systolicbp: "--",
+            diastolicbp: "--",
+            hdl: "--",
+            ldl: "--",
+            performedAt: new Date(),
+            interpretation: [
+              "1438--DEMO READER",
+              "NORMAL SINUS RHYTHM WITH SINUS ARRHYTHMIA",
+              "NORMAL ECG",
+              "NO PREVIOUS ECGS AVAILABLE",
+              "Normal ECG",
+              "INCOMPLETE ANALYSIS DUE TO MISSING DATA IN PRECORDIAL LEAD(S)",
+              "SINUS RHYTHM",
+              "SINUS ARRHYTHMIA"
+            ].join("\n")
+          };
+        }
+
+        function capitalize(value) {
+          if (!value) {
+            return "--";
+          }
+
+          return value.charAt(0).toUpperCase() + value.slice(1);
+        }
+
+        function compactArrayValue(value) {
+          if (Array.isArray(value)) {
+            return value.join(" ");
+          }
+
+          return value || "";
+        }
+
+        function calculateAge(birthDate) {
+          if (!birthDate) {
+            return "--";
+          }
+
+          var dob = new Date(birthDate + "T00:00:00");
+          if (Number.isNaN(dob.getTime())) {
+            return "--";
+          }
+
+          var today = new Date();
+          var age = today.getFullYear() - dob.getFullYear();
+          var monthDelta = today.getMonth() - dob.getMonth();
+          if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < dob.getDate())) {
+            age -= 1;
+          }
+
+          return age + " yrs";
+        }
+
+        function formatDate(value) {
+          if (!value) {
+            return "--";
+          }
+
+          var date = value instanceof Date ? value : new Date(value + "T00:00:00");
+          if (Number.isNaN(date.getTime())) {
+            return value;
+          }
+
+          return [
+            date.getMonth() + 1,
+            date.getDate(),
+            date.getFullYear()
+          ].join("/");
+        }
+
+        function pad(value) {
+          return String(value).padStart(2, "0");
+        }
+
+        function formatDateTime(value) {
+          var date = value instanceof Date ? value : new Date(value);
+          if (Number.isNaN(date.getTime())) {
+            date = new Date();
+          }
+
+          return [
+            date.getMonth() + 1,
+            date.getDate(),
+            date.getFullYear()
+          ].join("/") + " " + [
+            pad(date.getHours()),
+            pad(date.getMinutes()),
+            pad(date.getSeconds())
+          ].join(":");
+        }
+
+        function observationHasCode(observation, code) {
+          var codings = observation && observation.code && observation.code.coding;
+          if (!Array.isArray(codings)) {
+            return false;
+          }
+
+          return codings.some(function (coding) {
+            return coding.code === code;
+          });
+        }
+
+        function findObservation(observations, code) {
+          return (observations || []).filter(function (observation) {
+            return observationHasCode(observation, code);
+          })[0];
+        }
+
+        function getQuantityValueAndUnit(observation) {
+          if (!observation || !observation.valueQuantity) {
+            return "--";
+          }
+
+          var quantity = observation.valueQuantity;
+          if (quantity.value === undefined || quantity.value === null) {
+            return "--";
+          }
+
+          return quantity.value + (quantity.unit ? " " + quantity.unit : "");
+        }
+
+        function getBloodPressureValue(observations, code) {
+          var bp = findObservation(observations, "55284-4");
+          if (!bp || !Array.isArray(bp.component)) {
+            return "--";
+          }
+
+          var component = bp.component.filter(function (item) {
+            var codings = item && item.code && item.code.coding;
+            return Array.isArray(codings) && codings.some(function (coding) {
+              return coding.code === code;
+            });
+          })[0];
+
+          return getQuantityValueAndUnit({ valueQuantity: component && component.valueQuantity });
+        }
+
+        function normalizePatient(patient, observations) {
+          var fallback = demoPatient();
+          var name = patient && patient.name && patient.name[0] ? patient.name[0] : {};
+          var given = compactArrayValue(name.given);
+          var family = compactArrayValue(name.family);
+          var birthDate = patient && patient.birthDate ? patient.birthDate : fallback.birthDate;
+          var height = getQuantityValueAndUnit(findObservation(observations, "8302-2"));
+          var systolic = getBloodPressureValue(observations, "8480-6");
+          var diastolic = getBloodPressureValue(observations, "8462-4");
+          var hdl = getQuantityValueAndUnit(findObservation(observations, "2085-9"));
+          var ldl = getQuantityValueAndUnit(findObservation(observations, "2089-1"));
+
+          return {
+            firstName: given || fallback.firstName,
+            lastName: family || fallback.lastName,
+            patientId: patient && patient.id ? patient.id : fallback.patientId,
+            gender: capitalize(patient && patient.gender),
+            birthDate: birthDate,
+            race: fallback.race,
+            accountNumber: fallback.accountNumber,
+            accession: "ECG-" + (patient && patient.id ? patient.id : "DEMO"),
+            height: height !== "--" ? height : fallback.height,
+            weight: fallback.weight,
+            systolicbp: systolic,
+            diastolicbp: diastolic,
+            hdl: hdl,
+            ldl: ldl,
+            performedAt: new Date(),
+            interpretation: fallback.interpretation
+          };
+        }
+
+        function toPromise(value) {
+          if (!value) {
+            return Promise.resolve(null);
+          }
+
+          if (typeof value.done === "function" && typeof value.fail === "function") {
+            return new Promise(function (resolve, reject) {
+              value.done(resolve);
+              value.fail(reject);
+            });
+          }
+
+          if (typeof value.then === "function") {
+            return Promise.resolve(value);
+          }
+
+          return Promise.resolve(value);
+        }
+
+        function loadSmartPatient() {
+          return new Promise(function (resolve) {
+            var fallback = demoPatient();
+            var settled = false;
+
+            function finish(data) {
+              if (settled) {
+                return;
+              }
+
+              settled = true;
+              window.clearTimeout(timer);
+              resolve(data || fallback);
+            }
+
+            var timer = window.setTimeout(function () {
+              finish(fallback);
+            }, 2500);
+
+            if (!window.FHIR || !window.FHIR.oauth2 || typeof window.FHIR.oauth2.ready !== "function") {
+              finish(fallback);
+              return;
+            }
+
+            try {
+              window.FHIR.oauth2.ready(function (smart) {
+                if (!smart || !smart.patient || typeof smart.patient.read !== "function") {
+                  finish(fallback);
+                  return;
+                }
+
+                var observations = [];
+                if (smart.patient.api && typeof smart.patient.api.fetchAll === "function") {
+                  observations = smart.patient.api.fetchAll({
+                    type: "Observation",
+                    query: {
+                      code: {
+                        $or: [
+                          "http://loinc.org|8302-2",
+                          "http://loinc.org|8462-4",
+                          "http://loinc.org|8480-6",
+                          "http://loinc.org|2085-9",
+                          "http://loinc.org|2089-1",
+                          "http://loinc.org|55284-4"
+                        ]
+                      }
+                    }
+                  });
+                }
+
+                Promise.all([
+                  toPromise(smart.patient.read()),
+                  toPromise(observations)
+                ]).then(function (values) {
+                  finish(normalizePatient(values[0], values[1] || []));
+                }).catch(function () {
+                  finish(fallback);
+                });
+              }, function () {
+                finish(fallback);
+              });
+            } catch (error) {
+              finish(fallback);
+            }
+          });
+        }
+
+        function renderPatient(data) {
+          setText("firstName", data.firstName);
+          setText("lastName", data.lastName);
+          setText("patientId", data.patientId);
+          setText("age", calculateAge(data.birthDate));
+          setText("dob", formatDate(data.birthDate));
+          setText("performedAt", formatDateTime(data.performedAt));
+          setText("gender", data.gender);
+          setText("race", data.race);
+          setText("accountNumber", data.accountNumber);
+          setText("accession", data.accession);
+          setText("height", data.height);
+          setText("weight", data.weight);
+          setText("rx", "LDL " + (data.ldl || "--"));
+          setText("tech", "HDL " + (data.hdl || "--"));
+          setText("site", "Cardiovascular");
+          setText("location", "SMART App");
+          setText("dept", "FHIR");
+          setText("room", "ECG");
+          setText("dx", "BP " + (data.systolicbp || "--") + "/" + (data.diastolicbp || "--"));
+          setText("interpretation", data.interpretation);
+        }
+
+        function init() {
+          drawEcgChart();
+          loadSmartPatient().then(function (patient) {
+            renderPatient(patient);
+            document.body.classList.add("is-ready");
+          });
+        }
+
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", init);
+        } else {
+          init();
+        }
+      })();
     </script>
   </body>
 </html>
