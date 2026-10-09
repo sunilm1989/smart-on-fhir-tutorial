@@ -9,6 +9,28 @@
   var SHOW_EVENT_ALERTS = false;
   var currentStudyId = '';
   var dirtyDataSent = false;
+  var ECG_INTERPRETATION_SUGGESTIONS = [
+    'NORMAL SINUS RHYTHM',
+    'SINUS RHYTHM',
+    'SINUS ARRHYTHMIA',
+    'SINUS BRADYCARDIA',
+    'SINUS TACHYCARDIA',
+    'NORMAL ECG',
+    'ABNORMAL ECG',
+    'BORDERLINE ECG',
+    'FIRST DEGREE AV BLOCK',
+    'RIGHT BUNDLE BRANCH BLOCK',
+    'LEFT BUNDLE BRANCH BLOCK',
+    'NONSPECIFIC ST ABNORMALITY',
+    'ST ELEVATION, CONSIDER ACUTE INFARCT',
+    'ST DEPRESSION, CONSIDER ISCHEMIA',
+    'T WAVE ABNORMALITY, CONSIDER ISCHEMIA',
+    'LEFT AXIS DEVIATION',
+    'RIGHT AXIS DEVIATION',
+    'LEFT VENTRICULAR HYPERTROPHY',
+    'ATRIAL FIBRILLATION',
+    'ATRIAL FLUTTER'
+  ];
 
   var LEADS = [
     { name: 'I', row: 0, col: 0, p: 0.13, q: -0.11, r: 0.95, s: -0.28, t: 0.34, gain: 1, seed: 1 },
@@ -903,6 +925,7 @@
       '.smart-ecg-scroll { min-height: 0; overflow: auto; padding-bottom: .8rem; }',
       '.smart-ecg-section-title { display: flex; align-items: center; height: 1.38rem; padding: 0 .5rem; color: #1e2b38; background: #d6d9de; border-top: 1px solid #b5bcc7; border-bottom: 1px solid #b5bcc7; font-size: .82rem; font-weight: 800; }',
       '.smart-ecg-section-title svg { margin-right: .28rem; }',
+      '.smart-ecg-interpretation-wrap { position: relative; }',
       '.smart-ecg-box { margin: .48rem .55rem; background: #fff; border: 1px solid #9da9b8; }',
       '.smart-ecg-data-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }',
       '.smart-ecg-data-grid.smart-ecg-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }',
@@ -912,6 +935,10 @@
       '.smart-ecg-cell-label { display: block; margin-bottom: .3rem; color: #8993a1; font-size: .76rem; font-weight: 800; }',
       '.smart-ecg-cell-value { display: block; overflow-wrap: anywhere; color: #202833; font-size: .8rem; font-weight: 800; }',
       '.smart-ecg-interpretation { padding: .75rem .78rem 1.2rem; font-size: .78rem; font-weight: 800; line-height: 1.45; white-space: pre-line; }',
+      '.smart-ecg-suggestions { position: absolute; left: .55rem; right: .55rem; top: 2.25rem; z-index: 80; display: none; max-height: 13rem; overflow: auto; background: #fff; border: 1px solid #8da3c1; border-radius: 4px; box-shadow: 0 .45rem 1.25rem rgba(21,49,91,.22); }',
+      '.smart-ecg-suggestions.is-open { display: block; }',
+      '.smart-ecg-suggestion { display: block; width: 100%; padding: .52rem .65rem; color: #1f2d3d; background: #fff; border: 0; border-bottom: 1px solid #e4e8ee; text-align: left; font-size: .78rem; font-weight: 800; }',
+      '.smart-ecg-suggestion:hover, .smart-ecg-suggestion:focus { background: #edf2f9; outline: none; }',
       '.smart-ecg-event-monitor { position: fixed; right: 1rem; bottom: 1.15rem; z-index: 50; min-width: 18rem; max-width: min(32rem, calc(100vw - 2rem)); padding: .65rem .8rem; color: #10213a; background: #fff; border: 1px solid #88b7ff; border-left: 5px solid #0d45bf; border-radius: 4px; box-shadow: 0 .35rem 1rem rgba(21,49,91,.18); font-size: .78rem; line-height: 1.35; }',
       '.smart-ecg-event-monitor strong { display: block; margin-bottom: .2rem; color: #0d45bf; font-size: .78rem; }',
       '.smart-ecg-event-monitor code { font-family: Menlo, Consolas, monospace; font-size: .74rem; }',
@@ -1059,7 +1086,10 @@
       dataCell('Accession', 'ecg-accession'),
       '</div></div>',
       sectionTitle('Interpretation'),
+      '<div class="smart-ecg-interpretation-wrap">',
       '<div class="smart-ecg-interpretation" id="ecg-interpretation"></div>',
+      '<div class="smart-ecg-suggestions" id="smart-ecg-suggestions" role="listbox" aria-label="ECG interpretation suggestions"></div>',
+      '</div>',
       '</div>',
       '</aside>',
       '</div>',
@@ -1388,6 +1418,10 @@
       editButton.setAttribute('aria-pressed', enabled ? 'true' : 'false');
       editButton.title = enabled ? 'Stop editing' : 'Edit interpretation';
     }
+
+    if (!enabled) {
+      hideInterpretationSuggestions();
+    }
   }
 
   function getEditableDetailNodes() {
@@ -1416,6 +1450,78 @@
     });
     setSourceStatus('Pending data');
     sendCardiologyViewerEvent('PENDING_DATA', true);
+  }
+
+  function getCurrentInterpretationToken() {
+    var interpretation = byId('ecg-interpretation');
+    var text;
+    var lines;
+
+    if (!interpretation) {
+      return '';
+    }
+
+    text = interpretation.textContent || '';
+    lines = text.split(/\n/);
+    return (lines[lines.length - 1] || '').replace(/^\s+|\s+$/g, '');
+  }
+
+  function showInterpretationSuggestions() {
+    var suggestions = byId('smart-ecg-suggestions');
+    var token = getCurrentInterpretationToken().toUpperCase();
+    var matches = [];
+    var i;
+
+    if (!suggestions || !bodyHasClass('smart-ecg-editing')) {
+      return;
+    }
+
+    for (i = 0; i < ECG_INTERPRETATION_SUGGESTIONS.length; i += 1) {
+      if (!token || ECG_INTERPRETATION_SUGGESTIONS[i].indexOf(token) > -1) {
+        matches.push(ECG_INTERPRETATION_SUGGESTIONS[i]);
+      }
+      if (matches.length === 6) {
+        break;
+      }
+    }
+
+    if (!matches.length) {
+      hideInterpretationSuggestions();
+      return;
+    }
+
+    suggestions.innerHTML = matches.map(function(value) {
+      return '<button class="smart-ecg-suggestion" type="button" data-suggestion="' +
+        escapeHtml(value) + '">' + escapeHtml(value) + '</button>';
+    }).join('');
+    suggestions.className = 'smart-ecg-suggestions is-open';
+  }
+
+  function hideInterpretationSuggestions() {
+    var suggestions = byId('smart-ecg-suggestions');
+    if (suggestions) {
+      suggestions.className = 'smart-ecg-suggestions';
+    }
+  }
+
+  function insertInterpretationSuggestion(value) {
+    var interpretation = byId('ecg-interpretation');
+    var text;
+    var lines;
+
+    if (!interpretation || !value) {
+      return;
+    }
+
+    text = interpretation.textContent || '';
+    lines = text.split(/\n/);
+    lines[lines.length - 1] = value;
+    interpretation.textContent = lines.join('\n') + '\n';
+    hideInterpretationSuggestions();
+    markPendingData();
+    if (typeof interpretation.focus === 'function') {
+      interpretation.focus();
+    }
   }
 
   function clearPendingData() {
@@ -1482,6 +1588,8 @@
     var signButton = byId('smart-ecg-sign');
     var closeButton = byId('smart-ecg-close');
     var detailsPanel = document.querySelector ? document.querySelector('.smart-ecg-details') : null;
+    var interpretation = byId('ecg-interpretation');
+    var suggestions = byId('smart-ecg-suggestions');
 
     if (printButton) {
       printButton.onclick = function() {
@@ -1540,6 +1648,24 @@
     if (detailsPanel && typeof detailsPanel.addEventListener === 'function') {
       detailsPanel.addEventListener('input', markPendingData);
       detailsPanel.addEventListener('change', markPendingData);
+    }
+
+    if (interpretation && typeof interpretation.addEventListener === 'function') {
+      interpretation.addEventListener('input', showInterpretationSuggestions);
+      interpretation.addEventListener('focus', showInterpretationSuggestions);
+      interpretation.addEventListener('blur', function() {
+        window.setTimeout(hideInterpretationSuggestions, 160);
+      });
+    }
+
+    if (suggestions && typeof suggestions.addEventListener === 'function') {
+      suggestions.addEventListener('mousedown', function(event) {
+        var target = event.target || event.srcElement;
+        if (target && target.getAttribute && target.getAttribute('data-suggestion')) {
+          event.preventDefault();
+          insertInterpretationSuggestion(target.getAttribute('data-suggestion'));
+        }
+      });
     }
   }
 
