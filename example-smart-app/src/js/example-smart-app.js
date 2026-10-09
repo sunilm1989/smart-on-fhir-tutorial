@@ -302,6 +302,63 @@
     return '';
   }
 
+  function encodeSearchValue(value) {
+    return encodeURIComponent(value || '');
+  }
+
+  function buildSearchPath(resourceType, query) {
+    var parts = [];
+    var key;
+
+    for (key in query) {
+      if (Object.prototype.hasOwnProperty.call(query, key) &&
+          query[key] !== undefined &&
+          query[key] !== null &&
+          query[key] !== '') {
+        parts.push(encodeURIComponent(key) + '=' + encodeSearchValue(query[key]));
+      }
+    }
+
+    return resourceType + (parts.length ? '?' + parts.join('&') : '');
+  }
+
+  function requestFhir(smart, path, requestOptions) {
+    if (smart && typeof smart.request === 'function') {
+      return smart.request(path, requestOptions || {});
+    }
+
+    return null;
+  }
+
+  function fetchAllResources(smart, resourceType, query, patientId) {
+    var request = requestFhir(smart, buildSearchPath(resourceType, query), {
+      flat: true,
+      pageLimit: 0
+    });
+    var api = smart && smart.api;
+
+    if (request) {
+      return request;
+    }
+
+    if (smart &&
+        smart.patient &&
+        smart.patient.api &&
+        typeof smart.patient.api.fetchAll === 'function') {
+      api = smart.patient.api;
+    }
+
+    if (!api || typeof api.fetchAll !== 'function') {
+      return [];
+    }
+
+    return api.fetchAll({
+      type: resourceType,
+      patient: patientId || undefined,
+      query: query
+    });
+  }
+
   function getPatientName(patient) {
     var name = patient && patient.name && patient.name.length ? patient.name[0] : {};
     return {
@@ -453,12 +510,9 @@
     return [
       { type: 'DiagnosticReport', query: { identifier: studyId } },
       { type: 'DiagnosticReport', query: { _id: studyId } },
-      { type: 'DiagnosticReport', query: { accession: studyId } },
       { type: 'Observation', query: { identifier: studyId } },
       { type: 'Observation', query: { _id: studyId } },
-      { type: 'ImagingStudy', query: { accession: studyId } },
       { type: 'ImagingStudy', query: { identifier: studyId } },
-      { type: 'ImagingStudy', query: { uid: studyId } },
       { type: 'ImagingStudy', query: { _id: studyId } },
       { type: 'DocumentReference', query: { identifier: studyId } },
       { type: 'DocumentReference', query: { _id: studyId } }
@@ -468,15 +522,9 @@
   function searchStudyResource(smart, studyId) {
     var ret = makeDeferred();
     var attempts = getStudySearchAttempts(studyId);
-    var api = smart && smart.api;
 
     function next(index) {
       var attempt;
-
-      if (!api || typeof api.fetchAll !== 'function') {
-        ret.reject('FHIR search is not available');
-        return;
-      }
 
       if (index >= attempts.length) {
         ret.reject('No FHIR study resource found for study id ' + studyId);
@@ -485,10 +533,7 @@
 
       attempt = attempts[index];
       try {
-        toDeferred(api.fetchAll({
-          type: attempt.type,
-          query: attempt.query
-        })).done(function(result) {
+        toDeferred(fetchAllResources(smart, attempt.type, attempt.query)).done(function(result) {
           var resource = firstResource(result);
           var patientId = patientIdFromStudyResource(resource);
 
@@ -515,38 +560,65 @@
   }
 
   function fetchObservationsForPatient(smart, patientId) {
-    var api = smart && smart.api;
+    var codes = [
+      'http://loinc.org|8302-2',
+      'http://loinc.org|8462-4',
+      'http://loinc.org|8480-6',
+      'http://loinc.org|2085-9',
+      'http://loinc.org|2089-1',
+      'http://loinc.org|55284-4'
+    ];
+    var query = {
+      code: codes.join(',')
+    };
+
+    if (patientId) {
+      query.patient = patientId;
+    }
 
     if (smart &&
         smart.patient &&
         smart.patient.api &&
-        typeof smart.patient.api.fetchAll === 'function') {
-      api = smart.patient.api;
-    }
-
-    if (!api || typeof api.fetchAll !== 'function') {
-      return [];
-    }
-
-    return api.fetchAll({
-      type: 'Observation',
-      patient: patientId || undefined,
-      query: {
-        code: {
-          $or: [
-            'http://loinc.org|8302-2',
-            'http://loinc.org|8462-4',
-            'http://loinc.org|8480-6',
-            'http://loinc.org|2085-9',
-            'http://loinc.org|2089-1',
-            'http://loinc.org|55284-4'
-          ]
+        typeof smart.patient.api.fetchAll === 'function' &&
+        !smart.request) {
+      return smart.patient.api.fetchAll({
+        type: 'Observation',
+        query: {
+          code: {
+            $or: codes
+          }
         }
+      });
+    }
+
+    return fetchAllResources(smart, 'Observation', query, patientId);
+  }
+
+  function getLaunchPatientId(smart) {
+    if (smart && smart.patient) {
+      if (typeof smart.patient === 'string') {
+        return smart.patient;
       }
-    });
+
+      if (smart.patient.id) {
+        return smart.patient.id;
+      }
+    }
+
+    if (smart && smart.tokenResponse && smart.tokenResponse.patient) {
+      return smart.tokenResponse.patient;
+    }
+
+    return '';
   }
 
   function readPatientById(smart, patientId) {
+    var request = requestFhir(smart, 'Patient/' + encodeURIComponent(patientId));
+
+    if (request) {
+      return request;
+    }
+
     if (!smart || typeof smart.get !== 'function' || !patientId) {
       return null;
     }
@@ -585,10 +657,17 @@
 
   function readPatientFromLaunchContext(smart, studyId) {
     var ret = makeDeferred();
-    var patientId = smart && smart.patient ? smart.patient.id : '';
+    var patientId = getLaunchPatientId(smart);
+    var patientRead;
+
+    if (smart && smart.patient && typeof smart.patient.read === 'function') {
+      patientRead = smart.patient.read();
+    } else {
+      patientRead = readPatientById(smart, patientId);
+    }
 
     whenTwo(
-      smart.patient.read(),
+      patientRead,
       fetchObservationsForPatient(smart, patientId),
       function(patient, observations) {
         ret.resolve(normalizePatient(patient, observations || [], { studyId: studyId }));
@@ -627,8 +706,14 @@
     }
 
     try {
-      window.FHIR.oauth2.ready(function(smart) {
+      var readyHandled = false;
+      var handleReady = function(smart) {
         var studyId = getStudyId();
+
+        if (readyHandled) {
+          return;
+        }
+        readyHandled = true;
 
         setPvFrameworkPendingData(1);
 
@@ -637,7 +722,7 @@
           return;
         }
 
-        if (smart.patient && typeof smart.patient.read === 'function') {
+        if (getLaunchPatientId(smart)) {
           readPatientFromLaunchContext(smart, studyId).done(function(patient) {
             ret.resolve(patient);
           }).fail(function(error) {
@@ -662,12 +747,31 @@
         }
 
         failToDemo(ret, 'SMART launch without patient context');
-      }, function(error) {
+      };
+      var handleError = function(error) {
+        if (readyHandled) {
+          return;
+        }
+        readyHandled = true;
+
         if (window.console && typeof window.console.log === 'function') {
           window.console.log('SMART launch failed; showing demo ECG', error);
         }
         failToDemo(ret, 'Demo ECG');
-      });
+      };
+      var readyResult;
+
+      try {
+        readyResult = window.FHIR.oauth2.ready();
+      } catch (readyWithoutArgsError) {
+        readyResult = window.FHIR.oauth2.ready(handleReady, handleError);
+      }
+
+      if (readyResult && typeof readyResult.then === 'function') {
+        readyResult.then(handleReady, handleError);
+      } else if (readyResult) {
+        handleReady(readyResult);
+      }
     } catch (e) {
       if (window.console && typeof window.console.log === 'function') {
         window.console.log('SMART launch exception; showing demo ECG', e);
