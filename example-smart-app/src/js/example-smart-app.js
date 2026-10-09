@@ -900,6 +900,141 @@
     return ret.promise();
   }
 
+  function isFallbackName(patientData) {
+    return !patientData ||
+      ((patientData.fname || '') === 'Patient' && (patientData.lname || '') === 'Demo');
+  }
+
+  function studyMatchPatientData(patientData, smart) {
+    var fallback = defaultPatient();
+    var patientId = getLaunchPatientId(smart) ||
+      (patientData && patientData.patientId) ||
+      fallback.patientId;
+    var data = {
+      fname: patientData && patientData.fname ? patientData.fname : fallback.fname,
+      lname: patientData && patientData.lname ? patientData.lname : fallback.lname,
+      birthdate: patientData && patientData.birthdate ? patientData.birthdate : fallback.birthdate,
+      patientId: patientId
+    };
+
+    if (patientId === '72423' && isFallbackName(data)) {
+      data.fname = 'Paul';
+      data.lname = 'Jhon';
+      data.birthdate = '1989-04-05';
+    }
+
+    return data;
+  }
+
+  function patientDisplayName(patientData) {
+    var first = patientData && patientData.fname ? patientData.fname : '';
+    var last = patientData && patientData.lname ? patientData.lname : '';
+
+    if (last && first) {
+      return last + ', ' + first;
+    }
+
+    return last || first || '--';
+  }
+
+  function buildStudyMatchStudies(patientData) {
+    var name = patientDisplayName(patientData);
+    var patientId = patientData.patientId;
+    var dob = formatDate(patientData.birthdate);
+
+    return [
+      {
+        status: 'P',
+        datePerformed: '10/7/2026  14:22:00',
+        patientName: name.toLowerCase(),
+        patientId: patientId,
+        dob: dob,
+        site: 'Joe Cardiovascular',
+        readingProvider: 'card doctor',
+        referringMd: 'FELLOW1 CV',
+        type: 'ECG',
+        location: 'CD:22784933'
+      },
+      {
+        status: 'P',
+        datePerformed: '10/7/2026  16:20:00',
+        patientName: name,
+        patientId: patientId,
+        dob: dob,
+        site: 'Joe Cardiovascular',
+        readingProvider: '',
+        referringMd: '',
+        type: 'ECG',
+        location: ''
+      },
+      {
+        status: 'P',
+        datePerformed: '10/7/2026  19:25:00',
+        patientName: name.toLowerCase(),
+        patientId: patientId,
+        dob: dob,
+        site: 'Joe Cardiovascular',
+        readingProvider: '',
+        referringMd: '',
+        type: 'ECG',
+        location: ''
+      }
+    ];
+  }
+
+  function buildStudyMatchOrders(patientData) {
+    var name = patientDisplayName(patientData);
+    var patientId = patientData.patientId;
+    var dob = formatDate(patientData.birthdate);
+
+    return [
+      { patientName: name, patientId: patientId, dob: dob, date: '10/5/2026  08:32:00', status: 'Open', orderNumber: '1819241381', modality: 'ECG', site: 'Baxter' },
+      { patientName: name, patientId: patientId, dob: dob, date: '10/4/2026  23:01:00', status: 'Open', orderNumber: '1819281581', modality: 'ECG', site: 'Baseline West Medical Center' },
+      { patientName: name, patientId: patientId, dob: dob, date: '10/5/2026  23:04:00', status: 'Open', orderNumber: '1819281631', modality: 'ECG', site: 'Baseline West Medical Center' },
+      { patientName: name, patientId: patientId, dob: dob, date: '10/6/2026  23:13:00', status: 'Open', orderNumber: '1819282057', modality: 'ECG', site: 'Baseline West Medical Center' },
+      { patientName: name, patientId: patientId, dob: dob, date: '10/6/2026  23:43:00', status: 'Open', orderNumber: '1819282547', modality: 'ECG', site: 'Baseline West Medical Center' },
+      { patientName: name, patientId: patientId, dob: dob, date: '10/6/2026  23:51:00', status: 'Open', orderNumber: '1819282741', modality: 'ECG', site: 'Baseline West Medical Center' },
+      { patientName: name, patientId: patientId, dob: dob, date: '10/7/2026  00:50:00', status: 'Open', orderNumber: '1819283041', modality: 'ECG', site: 'Baseline West Medical Center' }
+    ];
+  }
+
+  function buildStudyMatchContext(patientData, smart) {
+    var data = studyMatchPatientData(patientData, smart);
+    return {
+      workflow: 'study-match',
+      patient: data,
+      patientId: data.patientId,
+      patientName: patientDisplayName(data),
+      studies: buildStudyMatchStudies(data),
+      orders: buildStudyMatchOrders(data)
+    };
+  }
+
+  function readStudyMatchContext(smart) {
+    var ret = makeDeferred();
+    var patientId = getLaunchPatientId(smart);
+    var patientRead;
+
+    if (smart && smart.patient && typeof smart.patient.read === 'function') {
+      patientRead = smart.patient.read();
+    } else {
+      patientRead = readPatientById(smart, patientId);
+    }
+
+    toDeferred(patientRead).done(function(patient) {
+      ret.resolve(buildStudyMatchContext(normalizePatient(patient, [], {
+        patientId: patientId
+      }), smart));
+    }).fail(function(error) {
+      if (window.console && typeof window.console.log === 'function') {
+        window.console.log('FHIR patient read failed; using study match fallback data', error);
+      }
+      ret.resolve(buildStudyMatchContext({ patientId: patientId }, smart));
+    });
+
+    return ret.promise();
+  }
+
   function applyLaunchIdentifiers(data, smart) {
     var patientId = getLaunchPatientId(smart);
     var studyId = getStudyId(smart);
@@ -945,6 +1080,7 @@
       var readyHandled = false;
       var handleReady = function(smart) {
         var studyId = getStudyId(smart);
+        var patientId;
 
         if (readyHandled) {
           return;
@@ -958,7 +1094,18 @@
           return;
         }
 
-        if (getLaunchPatientId(smart)) {
+        patientId = getLaunchPatientId(smart);
+
+        if (patientId && !studyId) {
+          readStudyMatchContext(smart).done(function(context) {
+            ret.resolve(context);
+          }).fail(function() {
+            ret.resolve(buildStudyMatchContext({ patientId: patientId }, smart));
+          });
+          return;
+        }
+
+        if (patientId) {
           readPatientFromLaunchContext(smart, studyId).done(function(patient) {
             ret.resolve(patient);
           }).fail(function(error) {
@@ -1080,6 +1227,72 @@
       '.smart-ecg-event-monitor { position: fixed; right: 1rem; bottom: 1.15rem; z-index: 50; min-width: 18rem; max-width: min(32rem, calc(100vw - 2rem)); padding: .65rem .8rem; color: #10213a; background: #fff; border: 1px solid #88b7ff; border-left: 5px solid #0d45bf; border-radius: 4px; box-shadow: 0 .35rem 1rem rgba(21,49,91,.18); font-size: .78rem; line-height: 1.35; }',
       '.smart-ecg-event-monitor strong { display: block; margin-bottom: .2rem; color: #0d45bf; font-size: .78rem; }',
       '.smart-ecg-event-monitor code { font-family: Menlo, Consolas, monospace; font-size: .74rem; }',
+      '.study-match-app, .study-match-app * { box-sizing: border-box; }',
+      '.study-match-app { display: grid; grid-template-columns: 13rem minmax(0, 1fr); height: 100vh; min-width: 60rem; color: #5f6873; background: #fff; font-size: .78rem; font-weight: 700; }',
+      '.study-match-sidebar { display: flex; flex-direction: column; min-width: 0; padding: .9rem .9rem 1rem; background: #f3f4f6; border-right: 1px solid #cfd4da; }',
+      '.study-match-sidebar h2 { margin: 0 0 .95rem; color: #1f2b37; font-size: .9rem; font-weight: 800; }',
+      '.study-match-filter { min-height: 2.7rem; padding: .08rem .2rem .32rem .55rem; border-bottom: 1px solid #b8bec6; }',
+      '.study-match-filter-label { display: block; color: #808995; font-size: .68rem; font-weight: 800; }',
+      '.study-match-filter-value { display: flex; align-items: center; justify-content: space-between; gap: .35rem; margin-top: .15rem; color: #3a4652; font-size: .82rem; font-weight: 800; }',
+      '.study-match-clear { color: #858d97; font-size: 1.1rem; line-height: 1; }',
+      '.study-match-section-label { margin: 1rem 0 .8rem; color: #333d49; font-size: .78rem; font-weight: 800; }',
+      '.study-match-date-field { display: flex; align-items: center; justify-content: space-between; height: 3.1rem; padding: 0 .25rem 0 .55rem; color: #8b939d; border-bottom: 1px solid #b8bec6; font-size: .84rem; }',
+      '.study-match-side-button { width: 100%; height: 1.9rem; margin-top: .9rem; color: #fff; background: #005a9f; border: 0; border-radius: 3px; box-shadow: 0 1px 3px rgba(0,0,0,.25); font-size: .75rem; font-weight: 800; letter-spacing: .04em; }',
+      '.study-match-side-button.secondary { margin-top: .45rem; color: #2d6394; background: #fff; border: 1px solid #d3d7dc; box-shadow: none; }',
+      '.study-match-support { margin-top: auto; padding-top: 2rem; text-align: center; color: #353f4a; line-height: 1.35; }',
+      '.study-match-brand { margin: 2.1rem 0 .4rem; color: #17649d; font-size: 1rem; font-style: italic; font-weight: 800; }',
+      '.study-match-product { color: #8a8f96; font-size: 1rem; font-weight: 500; }',
+      '.study-match-main { position: relative; min-width: 0; overflow: hidden; background: #fff; }',
+      '.study-match-topbar { display: flex; align-items: center; justify-content: space-between; height: 3.3rem; padding: 0 .9rem; color: #e9f3ff; background: #00589d; }',
+      '.study-match-result-count { display: flex; align-items: center; gap: .5rem; color: #eaf4ff; font-size: .95rem; font-weight: 800; }',
+      '.study-match-refresh { display: inline-flex; align-items: center; justify-content: center; width: 1.15rem; height: 1.15rem; border: 2px solid rgba(255,255,255,.75); border-radius: 50%; font-size: .72rem; line-height: 1; }',
+      '.study-match-toolbar { display: flex; align-items: center; gap: .65rem; color: #dceaf7; font-size: 1.05rem; font-weight: 800; }',
+      '.study-match-table-wrap { overflow: auto; height: calc(100vh - 3.3rem); }',
+      '.study-match-table { width: 100%; border-collapse: collapse; table-layout: fixed; }',
+      '.study-match-table th { height: 2.75rem; padding: 0 .55rem; color: #687382; background: #fff; border-bottom: 1px solid #d9dde2; text-align: left; font-size: .74rem; font-weight: 800; white-space: nowrap; }',
+      '.study-match-table td { height: 2.7rem; padding: .35rem .55rem; color: #67717d; border-bottom: 1px solid #eef0f3; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }',
+      '.study-match-table tr:nth-child(odd) td { background: #eef0f3; }',
+      '.study-match-table tr.is-selected td { background: #dbe9f6; }',
+      '.study-match-check { width: .9rem; height: .9rem; border-radius: 3px; background: #d3d9e0; display: inline-block; }',
+      '.study-match-status { display: inline-flex; align-items: center; justify-content: center; width: 1.55rem; height: 1.55rem; color: #25313d; background: #d5d9df; border-radius: 50%; font-size: .9rem; font-weight: 800; }',
+      '.study-match-row-action { width: 1.7rem; height: 1.7rem; border: 0; color: #263542; background: transparent; font-size: 1.3rem; line-height: 1; }',
+      '.study-match-menu { position: fixed; z-index: 70; width: 9.6rem; padding: .42rem 0; background: #fff; border-radius: 2px; box-shadow: 0 .45rem 1rem rgba(31,43,55,.28); }',
+      '.study-match-menu[hidden] { display: none; }',
+      '.study-match-menu button { display: block; width: 100%; min-height: 2.05rem; padding: 0 1rem; color: #4d5864; background: transparent; border: 0; text-align: left; font-size: .75rem; font-weight: 800; }',
+      '.study-match-menu button:hover, .study-match-menu button:focus { background: #eef1f4; outline: none; }',
+      '.study-match-overlay { position: fixed; inset: 0; z-index: 80; background: rgba(38, 42, 48, .34); }',
+      '.study-match-overlay[hidden] { display: none; }',
+      '.study-match-order-window { position: absolute; left: 5rem; right: 6rem; top: 9rem; min-height: 34rem; display: grid; grid-template-columns: 13.2rem minmax(0, 1fr); background: #fff; border-radius: 3px; box-shadow: 0 .2rem .8rem rgba(0,0,0,.18); overflow: hidden; }',
+      '.study-match-order-summary { color: #fff; background: #005a9f; }',
+      '.study-match-order-patient { padding: .45rem .6rem .35rem; text-align: center; font-size: .85rem; font-weight: 800; }',
+      '.study-match-summary-grid { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid rgba(255,255,255,.18); }',
+      '.study-match-summary-cell { min-height: 2.25rem; padding: .35rem .42rem; border-right: 1px solid rgba(255,255,255,.18); border-bottom: 1px solid rgba(255,255,255,.18); }',
+      '.study-match-summary-label { display: block; color: #b9d8f2; font-size: .6rem; }',
+      '.study-match-summary-value { display: block; margin-top: .1rem; color: #fff; font-size: .64rem; line-height: 1.2; }',
+      '.study-match-order-search { padding: .75rem .65rem; color: #4e5965; background: #f5f6f8; }',
+      '.study-match-order-search h3 { margin: 0 0 .65rem; color: #2e3844; font-size: .82rem; font-weight: 800; }',
+      '.study-match-order-input { display: flex; align-items: center; justify-content: space-between; height: 2.55rem; padding: 0 .25rem 0 .6rem; border-bottom: 1px solid #bfc5cc; }',
+      '.study-match-radio { display: flex; align-items: center; gap: .4rem; height: 1.55rem; }',
+      '.study-match-radio-dot { width: .85rem; height: .85rem; border-radius: 50%; border: 2px solid #b7bdc5; }',
+      '.study-match-radio.is-selected .study-match-radio-dot { border: 4px solid #0b86e8; }',
+      '.study-match-find { float: right; min-width: 3.4rem; height: 1.9rem; margin-top: .8rem; color: #fff; background: #005a9f; border: 0; border-radius: 3px; box-shadow: 0 1px 3px rgba(0,0,0,.25); font-size: .72rem; font-weight: 800; }',
+      '.study-match-order-list { min-width: 0; padding: .6rem 1.4rem 1rem; background: #fff; }',
+      '.study-match-close { position: absolute; top: .4rem; right: .55rem; width: 1.8rem; height: 1.8rem; border: 0; color: #343d47; background: transparent; font-size: 1.5rem; line-height: 1; }',
+      '.study-match-order-table { width: 100%; border-collapse: collapse; table-layout: fixed; }',
+      '.study-match-order-table th { height: 2.5rem; color: #687382; text-align: left; font-size: .74rem; font-weight: 800; }',
+      '.study-match-order-table td { height: 2.65rem; padding: .25rem .4rem; color: #65707d; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }',
+      '.study-match-order-table tr:nth-child(odd) td { background: #eef0f3; }',
+      '.study-match-select-order { min-width: 4.6rem; height: 1.55rem; color: #fff; background: #005a9f; border: 0; border-radius: 3px; box-shadow: 0 1px 3px rgba(0,0,0,.25); font-size: .72rem; font-weight: 800; }',
+      '.study-match-reconcile-card { position: absolute; left: 50%; top: 29%; transform: translate(-50%, -50%); width: 35.6rem; background: #fff; border-radius: 4px; box-shadow: 0 .2rem .8rem rgba(0,0,0,.2); overflow: hidden; }',
+      '.study-match-compare { width: 100%; border-collapse: collapse; table-layout: fixed; }',
+      '.study-match-compare th, .study-match-compare td { height: 3.6rem; padding: .45rem .8rem; border-bottom: 1px solid #e2e5e8; text-align: center; }',
+      '.study-match-compare th { color: #26313d; font-size: .78rem; font-weight: 800; }',
+      '.study-match-compare-label { color: #29333f; font-weight: 800; }',
+      '.study-match-compare-value { background: #f2f3f5; color: #4a5562; }',
+      '.study-match-dialog-actions { display: flex; align-items: center; justify-content: flex-end; gap: .8rem; height: 3.7rem; padding: 0 .7rem; }',
+      '.study-match-dialog-actions button { height: 1.9rem; border: 0; border-radius: 3px; font-size: .72rem; font-weight: 800; letter-spacing: .04em; }',
+      '.study-match-cancel { color: #005a9f; background: transparent; }',
+      '.study-match-promote { min-width: 8.2rem; color: #fff; background: #005a9f; box-shadow: 0 1px 3px rgba(0,0,0,.25); }',
       '@media print { .smart-ecg-event-monitor { display: none !important; } .smart-ecg-stage, .smart-ecg-svg { -webkit-print-color-adjust: exact; print-color-adjust: exact; } body.smart-ecg-body { overflow: visible; background: #fff; } }',
       '@media (max-width: 1100px) { body.smart-ecg-body { overflow: auto; } .smart-ecg-app { grid-template-columns: 1fr; height: auto; min-height: 100vh; } .smart-ecg-viewer { min-height: 680px; border-right: 0; border-bottom: 1px solid #9aa5b4; } .smart-ecg-details { grid-template-rows: 2.75rem auto auto; } }',
       '@media (max-width: 720px) { .smart-ecg-metrics { overflow-x: auto; } .smart-ecg-viewer { grid-template-rows: 3rem 2.25rem 560px; min-height: 0; } .smart-ecg-patient-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .smart-ecg-field.smart-ecg-span-2 { grid-column: span 1; } .smart-ecg-data-grid, .smart-ecg-data-grid.smart-ecg-two { grid-template-columns: repeat(2, minmax(0, 1fr)); } .smart-ecg-data-grid.smart-ecg-one { grid-template-columns: 1fr; } }'
@@ -1235,6 +1448,179 @@
       '<div class="smart-ecg-event-monitor" id="smart-ecg-event-monitor" aria-live="polite">',
       '<strong>Event monitor</strong>',
       '<span>Waiting for Save, Sign, Edit, or Close action.</span>',
+      '</div>'
+    ].join('');
+  }
+
+  function studyMatchSidebarHtml(context) {
+    return [
+      '<aside class="study-match-sidebar" aria-label="Inbox settings">',
+      '<h2>Inbox Settings</h2>',
+      '<div class="study-match-filter"><span class="study-match-filter-label">Status</span><span class="study-match-filter-value">Preliminary<span>v</span></span></div>',
+      '<div class="study-match-filter"><span class="study-match-filter-label">Site</span><span class="study-match-filter-value">Baseline West Medic...<span>v</span></span></div>',
+      '<div class="study-match-filter"><span class="study-match-filter-label">Type</span><span class="study-match-filter-value">ECG<span>v</span></span></div>',
+      '<div class="study-match-filter"><span class="study-match-filter-label">Search By</span><span class="study-match-filter-value">Pat ID<span>v</span></span></div>',
+      '<div class="study-match-filter"><span class="study-match-filter-label">Search</span><span class="study-match-filter-value">', escapeHtml(context.patientId), '<span class="study-match-clear">x</span></span></div>',
+      '<div class="study-match-section-label">Date Performed</div>',
+      '<div class="study-match-date-field"><span>Start Date</span><span>[]</span></div>',
+      '<div class="study-match-date-field"><span>End Date</span><span>[]</span></div>',
+      '<button class="study-match-side-button" type="button">SEARCH</button>',
+      '<button class="study-match-side-button secondary" type="button">SAVE DEFAULTS</button>',
+      '<div class="study-match-support">',
+      '<div>For Support please call<br>1-844-754-9038</div>',
+      '<div class="study-match-brand">Baxter</div>',
+      '<div class="study-match-product">Cardio Server</div>',
+      '</div>',
+      '</aside>'
+    ].join('');
+  }
+
+  function studyMatchRowsHtml(studies) {
+    return studies.map(function(study, index) {
+      return [
+        '<tr class="study-match-result-row ', index === 0 ? 'is-selected' : '', '" data-study-index="', index, '">',
+        '<td><span class="study-match-check" aria-hidden="true"></span></td>',
+        '<td><span class="study-match-status">', escapeHtml(study.status), '</span></td>',
+        '<td>', escapeHtml(study.datePerformed), '</td>',
+        '<td>', escapeHtml(study.patientName), '</td>',
+        '<td>', escapeHtml(study.patientId), '</td>',
+        '<td>', escapeHtml(study.dob), '</td>',
+        '<td title="', escapeHtml(study.site), '">', escapeHtml(study.site), '</td>',
+        '<td>', escapeHtml(study.readingProvider), '</td>',
+        '<td>', escapeHtml(study.referringMd), '</td>',
+        '<td>', escapeHtml(study.type), '</td>',
+        '<td>', escapeHtml(study.location), '</td>',
+        '<td><button class="study-match-row-action" type="button" data-study-action="menu" data-study-index="', index, '" aria-label="Study actions">...</button></td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+  }
+
+  function studyMatchInboxHtml(context) {
+    return [
+      '<div class="study-match-app" id="study-match-app">',
+      studyMatchSidebarHtml(context),
+      '<main class="study-match-main" aria-label="Unmatched studies">',
+      '<div class="study-match-topbar">',
+      '<div class="study-match-result-count"><span class="study-match-refresh">C</span><span>', context.studies.length, ' Results</span></div>',
+      '<div class="study-match-toolbar"><span>|||</span><span>O</span><span>[]</span><span>=</span></div>',
+      '</div>',
+      '<div class="study-match-table-wrap">',
+      '<table class="study-match-table">',
+      '<colgroup>',
+      '<col style="width:2.2rem"><col style="width:4rem"><col style="width:10rem"><col style="width:10rem"><col style="width:6rem"><col style="width:7rem">',
+      '<col style="width:7rem"><col style="width:9rem"><col style="width:9rem"><col style="width:5rem"><col style="width:9rem"><col style="width:3rem">',
+      '</colgroup>',
+      '<thead><tr>',
+      '<th></th><th>Status</th><th>Date Performed ^</th><th>Patient Name</th><th>Pat ID</th><th>DOB</th>',
+      '<th>Site</th><th>Reading Provider</th><th>Referring MD</th><th>Type</th><th>Location</th><th></th>',
+      '</tr></thead>',
+      '<tbody>', studyMatchRowsHtml(context.studies), '</tbody>',
+      '</table>',
+      '</div>',
+      '<div class="study-match-menu" id="study-match-menu" hidden>',
+      '<button type="button" data-menu-action="noop">Print</button>',
+      '<button type="button" data-menu-action="noop">Print Cover</button>',
+      '<button type="button" data-menu-action="noop">Trash</button>',
+      '<button type="button" data-menu-action="noop">Assign to Site</button>',
+      '<button type="button" data-menu-action="noop">Assign to Reading MD</button>',
+      '<button type="button" data-menu-action="reconcile-by-id">Reconcile by ID</button>',
+      '<button type="button" data-menu-action="noop">Reconcile by Name</button>',
+      '<button type="button" data-menu-action="noop">Edit Note</button>',
+      '<button type="button" data-menu-action="noop">Stat</button>',
+      '</div>',
+      '<div class="study-match-overlay" id="study-match-order-overlay" hidden></div>',
+      '<div class="study-match-overlay" id="study-match-reconcile-overlay" hidden></div>',
+      '</main>',
+      '</div>'
+    ].join('');
+  }
+
+  function studySummaryHtml(study, patient) {
+    var performedParts = study.datePerformed.split(/\s+/);
+    var performedDate = performedParts[0] || study.datePerformed;
+    var performedTime = performedParts.slice(1).join(' ');
+
+    return [
+      '<div class="study-match-order-summary">',
+      '<div class="study-match-order-patient">', escapeHtml(patientDisplayName(patient)), '<br>', escapeHtml(patient.patientId), '</div>',
+      '<div class="study-match-summary-grid">',
+      '<div class="study-match-summary-cell"><span class="study-match-summary-label">Date Performed</span><span class="study-match-summary-value">', escapeHtml(performedDate), '<br>', escapeHtml(performedTime), '</span></div>',
+      '<div class="study-match-summary-cell"><span class="study-match-summary-label">Site</span><span class="study-match-summary-value">', escapeHtml(study.site), '</span></div>',
+      '<div class="study-match-summary-cell"><span class="study-match-summary-label">DOB</span><span class="study-match-summary-value">', escapeHtml(study.dob), '</span></div>',
+      '<div class="study-match-summary-cell"><span class="study-match-summary-label">Location</span><span class="study-match-summary-value">', escapeHtml(study.location), '</span></div>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function studyMatchOrderRowsHtml(orders) {
+    return orders.map(function(order, index) {
+      return [
+        '<tr>',
+        '<td>', escapeHtml(order.patientName), '</td>',
+        '<td>', escapeHtml(order.patientId), '</td>',
+        '<td>', escapeHtml(order.dob), '</td>',
+        '<td>', escapeHtml(order.date), '</td>',
+        '<td>', escapeHtml(order.status), '</td>',
+        '<td>', escapeHtml(order.orderNumber), '</td>',
+        '<td>', escapeHtml(order.modality), '</td>',
+        '<td>', escapeHtml(order.site), '</td>',
+        '<td><button class="study-match-select-order" type="button" data-order-index="', index, '">SELECT</button></td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+  }
+
+  function studyMatchOrderOverlayHtml(context, studyIndex) {
+    var study = context.studies[studyIndex] || context.studies[0];
+    return [
+      '<div class="study-match-order-window">',
+      '<aside>',
+      studySummaryHtml(study, context.patient),
+      '<div class="study-match-order-search">',
+      '<h3>Order Search</h3>',
+      '<div class="study-match-order-input"><span><small>Patient ID</small><br>', escapeHtml(context.patientId), '</span><span>x</span></div>',
+      '<div class="study-match-radio is-selected"><span class="study-match-radio-dot"></span><span>Patient ID</span></div>',
+      '<div class="study-match-radio"><span class="study-match-radio-dot"></span><span>Last Name</span></div>',
+      '<div class="study-match-order-input"><span>Order Date</span><span>[]</span></div>',
+      '<div class="study-match-order-input"><span>Order Number</span><span>x</span></div>',
+      '<div class="study-match-order-input"><span><small>Order Status</small><br>Open</span><span>v</span></div>',
+      '<div class="study-match-order-input"><span><small>Site</small><br>All</span><span>v</span></div>',
+      '<button class="study-match-find" type="button">FIND</button>',
+      '</div>',
+      '</aside>',
+      '<section class="study-match-order-list">',
+      '<button class="study-match-close" type="button" data-dialog-action="close-order" aria-label="Close order search">x</button>',
+      '<table class="study-match-order-table">',
+      '<thead><tr><th>Patient Name</th><th>Patient ID</th><th>DOB</th><th>Date</th><th>Status</th><th>Order #</th><th>Modality</th><th>Site</th><th></th></tr></thead>',
+      '<tbody>', studyMatchOrderRowsHtml(context.orders), '</tbody>',
+      '</table>',
+      '</section>',
+      '</div>'
+    ].join('');
+  }
+
+  function studyMatchReconcileOverlayHtml(context, studyIndex, orderIndex) {
+    var study = context.studies[studyIndex] || context.studies[0];
+    var order = context.orders[orderIndex] || context.orders[0];
+    var patient = context.patient;
+
+    return [
+      '<div class="study-match-reconcile-card">',
+      '<table class="study-match-compare">',
+      '<thead><tr><th></th><th>Study</th><th></th><th>Order #', escapeHtml(order.orderNumber), '</th></tr></thead>',
+      '<tbody>',
+      '<tr><td class="study-match-compare-label">Last Name</td><td class="study-match-compare-value">', escapeHtml(patient.lname), '</td><td></td><td class="study-match-compare-value">', escapeHtml(patient.lname), '</td></tr>',
+      '<tr><td class="study-match-compare-label">First Name</td><td class="study-match-compare-value">', escapeHtml(patient.fname), '</td><td></td><td class="study-match-compare-value">', escapeHtml(patient.fname), '</td></tr>',
+      '<tr><td class="study-match-compare-label">Patient ID</td><td class="study-match-compare-value">', escapeHtml(patient.patientId), '</td><td></td><td class="study-match-compare-value">', escapeHtml(order.patientId), '</td></tr>',
+      '<tr><td class="study-match-compare-label">Date</td><td class="study-match-compare-value">', escapeHtml(study.datePerformed.split(' ')[0]), '</td><td></td><td class="study-match-compare-value">', escapeHtml(order.date.split(' ')[0]), '</td></tr>',
+      '</tbody>',
+      '</table>',
+      '<div class="study-match-dialog-actions">',
+      '<button class="study-match-cancel" type="button" data-dialog-action="cancel-reconcile">CANCEL</button>',
+      '<button class="study-match-promote" type="button" data-dialog-action="save-promote" data-order-index="', orderIndex, '">SAVE &amp; PROMOTE</button>',
+      '</div>',
       '</div>'
     ].join('');
   }
@@ -1853,8 +2239,207 @@
     }
   }
 
+  function findActionTarget(target, attributeName) {
+    while (target && target !== document.body) {
+      if (target.getAttribute && target.getAttribute(attributeName) !== null) {
+        return target;
+      }
+      target = target.parentNode;
+    }
+
+    return null;
+  }
+
+  function elementHasClass(node, className) {
+    return !!(node && typeof node.className === 'string' &&
+      (' ' + node.className + ' ').indexOf(' ' + className + ' ') > -1);
+  }
+
+  function selectStudyMatchRow(index) {
+    var rows = document.querySelectorAll ? document.querySelectorAll('.study-match-result-row') : [];
+    var i;
+
+    for (i = 0; i < rows.length; i += 1) {
+      rows[i].className = rows[i].className.replace(/\s*is-selected/g, '');
+      if (i === index) {
+        rows[i].className += ' is-selected';
+      }
+    }
+  }
+
+  function closeStudyMatchMenu() {
+    var menu = byId('study-match-menu');
+    if (menu) {
+      menu.setAttribute('hidden', 'hidden');
+    }
+  }
+
+  function openStudyMatchMenu(index, button) {
+    var menu = byId('study-match-menu');
+    var rect;
+    var right;
+
+    if (!menu || !button || !button.getBoundingClientRect) {
+      return;
+    }
+
+    selectStudyMatchRow(index);
+    rect = button.getBoundingClientRect();
+    right = Math.max(2, window.innerWidth - rect.right + 4);
+    menu.setAttribute('data-study-index', String(index));
+    menu.style.top = Math.max(3.6, rect.top - 8) + 'px';
+    menu.style.right = right + 'px';
+    menu.removeAttribute('hidden');
+  }
+
+  function openStudyMatchOrderSearch(context, studyIndex) {
+    var overlay = byId('study-match-order-overlay');
+    var reconcileOverlay = byId('study-match-reconcile-overlay');
+
+    closeStudyMatchMenu();
+    selectStudyMatchRow(studyIndex);
+
+    if (reconcileOverlay) {
+      reconcileOverlay.setAttribute('hidden', 'hidden');
+      reconcileOverlay.innerHTML = '';
+    }
+
+    if (overlay) {
+      overlay.innerHTML = studyMatchOrderOverlayHtml(context, studyIndex);
+      overlay.setAttribute('data-study-index', String(studyIndex));
+      overlay.removeAttribute('hidden');
+    }
+  }
+
+  function closeStudyMatchOrderSearch() {
+    var overlay = byId('study-match-order-overlay');
+    if (overlay) {
+      overlay.setAttribute('hidden', 'hidden');
+      overlay.innerHTML = '';
+    }
+  }
+
+  function openStudyMatchReconcile(context, studyIndex, orderIndex) {
+    var orderOverlay = byId('study-match-order-overlay');
+    var reconcileOverlay = byId('study-match-reconcile-overlay');
+
+    closeStudyMatchOrderSearch();
+
+    if (orderOverlay) {
+      orderOverlay.setAttribute('hidden', 'hidden');
+    }
+
+    if (reconcileOverlay) {
+      reconcileOverlay.innerHTML = studyMatchReconcileOverlayHtml(context, studyIndex, orderIndex);
+      reconcileOverlay.setAttribute('data-study-index', String(studyIndex));
+      reconcileOverlay.setAttribute('data-order-index', String(orderIndex));
+      reconcileOverlay.removeAttribute('hidden');
+    }
+  }
+
+  function closeStudyMatchReconcile() {
+    var overlay = byId('study-match-reconcile-overlay');
+    if (overlay) {
+      overlay.setAttribute('hidden', 'hidden');
+      overlay.innerHTML = '';
+    }
+  }
+
+  function saveAndPromoteStudyMatch(context, studyIndex, orderIndex) {
+    var study = context.studies[studyIndex] || context.studies[0];
+    var order = context.orders[orderIndex] || context.orders[0];
+    var payload = {
+      workflow: 'study-match',
+      patientId: context.patientId,
+      studyDatePerformed: study.datePerformed,
+      studyLocation: study.location,
+      orderNumber: order.orderNumber,
+      orderDate: order.date,
+      orderStatus: order.status,
+      modality: order.modality
+    };
+
+    setCurrentStudyId(order.orderNumber || study.location || context.patientId);
+    sendCardiologyViewerEvent('STUDY_COMPLETED', payload);
+    closeStudyMatchReconcile();
+  }
+
+  function attachStudyMatchActions(context) {
+    var app = byId('study-match-app');
+
+    if (!app) {
+      return;
+    }
+
+    app.onclick = function(event) {
+      var target = event.target || event.srcElement;
+      var rowAction = findActionTarget(target, 'data-study-action');
+      var menuAction = findActionTarget(target, 'data-menu-action');
+      var dialogAction = findActionTarget(target, 'data-dialog-action');
+      var orderAction = findActionTarget(target, 'data-order-index');
+      var menu = byId('study-match-menu');
+      var studyIndex;
+      var orderIndex;
+
+      if (rowAction) {
+        studyIndex = parseInt(rowAction.getAttribute('data-study-index'), 10) || 0;
+        openStudyMatchMenu(studyIndex, rowAction);
+        return;
+      }
+
+      if (menuAction) {
+        studyIndex = menu ? parseInt(menu.getAttribute('data-study-index'), 10) || 0 : 0;
+        if (menuAction.getAttribute('data-menu-action') === 'reconcile-by-id') {
+          openStudyMatchOrderSearch(context, studyIndex);
+        } else {
+          closeStudyMatchMenu();
+        }
+        return;
+      }
+
+      if (dialogAction) {
+        if (dialogAction.getAttribute('data-dialog-action') === 'close-order') {
+          closeStudyMatchOrderSearch();
+          return;
+        }
+
+        if (dialogAction.getAttribute('data-dialog-action') === 'cancel-reconcile') {
+          closeStudyMatchReconcile();
+          return;
+        }
+
+        if (dialogAction.getAttribute('data-dialog-action') === 'save-promote') {
+          studyIndex = parseInt(byId('study-match-reconcile-overlay').getAttribute('data-study-index'), 10) || 0;
+          orderIndex = parseInt(dialogAction.getAttribute('data-order-index'), 10) || 0;
+          saveAndPromoteStudyMatch(context, studyIndex, orderIndex);
+          return;
+        }
+      }
+
+      if (orderAction && elementHasClass(orderAction, 'study-match-select-order')) {
+        studyIndex = parseInt(byId('study-match-order-overlay').getAttribute('data-study-index'), 10) || 0;
+        orderIndex = parseInt(orderAction.getAttribute('data-order-index'), 10) || 0;
+        openStudyMatchReconcile(context, studyIndex, orderIndex);
+      }
+    };
+  }
+
+  function drawStudyMatchWorkflow(context) {
+    installStyles();
+    document.body.className = (document.body.className + ' smart-ecg-body').replace(/\s+/g, ' ');
+    document.body.innerHTML = studyMatchInboxHtml(context);
+    setCurrentStudyId(context.patientId);
+    attachStudyMatchActions(context);
+  }
+
   window.drawVisualization = function(p) {
     var patient = p || defaultPatient();
+
+    if (patient.workflow === 'study-match') {
+      drawStudyMatchWorkflow(patient);
+      return;
+    }
+
     installStyles();
     document.body.className = (document.body.className + ' smart-ecg-body').replace(/\s+/g, ' ');
     document.body.innerHTML = shellHtml();
