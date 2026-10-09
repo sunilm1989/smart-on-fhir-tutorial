@@ -248,6 +248,12 @@
     };
   }
 
+  function logTroubleshooting(message, data) {
+    if (window.console && typeof window.console.log === 'function') {
+      window.console.log('[SMART ECG Viewer] ' + message, data || '');
+    }
+  }
+
   function sendCardiologyViewerEvent(action, data) {
     var detail = createEventDetail(action, getCurrentStudyId(), data === undefined ? '' : data);
     var payload = {
@@ -256,29 +262,32 @@
     };
     var event;
 
+    logTroubleshooting('event triggered: ' + action, payload);
+
     try {
       event = new window.CustomEvent(EVENT_NAME, { detail: detail });
       window.dispatchEvent(event);
+      logTroubleshooting('CustomEvent dispatched: ' + EVENT_NAME, detail);
     } catch (e) {
       if (document.createEvent) {
         event = document.createEvent('CustomEvent');
         event.initCustomEvent(EVENT_NAME, false, false, detail);
         window.dispatchEvent(event);
+        logTroubleshooting('legacy CustomEvent dispatched: ' + EVENT_NAME, detail);
       }
     }
 
     try {
       if (window.parent && window.parent !== window && typeof window.parent.postMessage === 'function') {
         window.parent.postMessage(payload, '*');
+        logTroubleshooting('postMessage sent to parent', payload);
+      } else {
+        logTroubleshooting('postMessage skipped because no parent frame is available', payload);
       }
     } catch (postMessageError) {
       if (window.console && typeof window.console.log === 'function') {
-        window.console.log('Unable to post cardiology viewer event', postMessageError);
+        window.console.log('[SMART ECG Viewer] unable to post cardiology viewer event', postMessageError);
       }
-    }
-
-    if (window.console && typeof window.console.log === 'function') {
-      window.console.log(EVENT_NAME, detail);
     }
   }
 
@@ -1315,6 +1324,11 @@
     var editButton = byId('smart-ecg-edit');
     var i;
 
+    logTroubleshooting('edit mode changed', {
+      enabled: enabled,
+      editableFieldCount: editableNodes.length
+    });
+
     for (i = 0; i < editableNodes.length; i += 1) {
       editableNodes[i].contentEditable = enabled ? 'true' : 'false';
       editableNodes[i].setAttribute('aria-readonly', enabled ? 'false' : 'true');
@@ -1350,20 +1364,32 @@
 
   function markPendingData() {
     if (dirtyDataSent) {
+      logTroubleshooting('pending data already marked; duplicate dirty event suppressed', {
+        studyId: getCurrentStudyId()
+      });
       return;
     }
 
     dirtyDataSent = true;
+    logTroubleshooting('right-side ECG details changed; marking pending data', {
+      studyId: getCurrentStudyId()
+    });
     setSourceStatus('Pending data');
     sendCardiologyViewerEvent('PENDING_DATA', true);
   }
 
   function clearPendingData() {
     if (!dirtyDataSent) {
+      logTroubleshooting('pending data clear skipped; no dirty state is active', {
+        studyId: getCurrentStudyId()
+      });
       return;
     }
 
     dirtyDataSent = false;
+    logTroubleshooting('clearing pending data', {
+      studyId: getCurrentStudyId()
+    });
     sendCardiologyViewerEvent('PENDING_DATA', false);
   }
 
@@ -1387,15 +1413,22 @@
     var payload = currentEcgPayload(status);
     var key = 'smart_ecg_' + (payload.accession || payload.patientId || 'current');
 
+    logTroubleshooting('saving ECG state', {
+      key: key,
+      status: status,
+      studyId: getCurrentStudyId()
+    });
+
     try {
       if (window.localStorage) {
         window.localStorage.setItem(key, JSON.stringify(payload));
       }
       setSourceStatus(status);
+      logTroubleshooting('ECG state saved', payload);
       return true;
     } catch (e) {
       if (window.console && typeof window.console.log === 'function') {
-        window.console.log('Unable to save ECG locally', e);
+        window.console.log('[SMART ECG Viewer] unable to save ECG locally', e);
       }
       setSourceStatus('Save failed');
       return false;
@@ -1414,18 +1447,28 @@
 
     if (printButton) {
       printButton.onclick = function() {
+        logTroubleshooting('print button clicked', {
+          studyId: getCurrentStudyId()
+        });
         window.print();
       };
     }
 
     if (editButton) {
       editButton.onclick = function() {
+        logTroubleshooting('edit button clicked', {
+          studyId: getCurrentStudyId(),
+          currentlyEditing: bodyHasClass('smart-ecg-editing')
+        });
         setEditMode(!bodyHasClass('smart-ecg-editing'));
       };
     }
 
     if (saveButton) {
       saveButton.onclick = function() {
+        logTroubleshooting('top save button clicked', {
+          studyId: getCurrentStudyId()
+        });
         if (saveEcg('Saved')) {
           clearPendingData();
           sendCardiologyViewerEvent('STUDY_COMPLETED', '');
@@ -1435,6 +1478,9 @@
 
     if (floatingSaveButton) {
       floatingSaveButton.onclick = function() {
+        logTroubleshooting('floating save button clicked', {
+          studyId: getCurrentStudyId()
+        });
         if (saveEcg('Saved')) {
           clearPendingData();
           sendCardiologyViewerEvent('STUDY_COMPLETED', '');
@@ -1444,6 +1490,9 @@
 
     if (signButton) {
       signButton.onclick = function() {
+        logTroubleshooting('top sign button clicked', {
+          studyId: getCurrentStudyId()
+        });
         if (saveEcg('Signed')) {
           clearPendingData();
           sendCardiologyViewerEvent('STUDY_COMPLETED', '');
@@ -1455,6 +1504,9 @@
 
     if (floatingSignButton) {
       floatingSignButton.onclick = function() {
+        logTroubleshooting('floating sign button clicked', {
+          studyId: getCurrentStudyId()
+        });
         if (saveEcg('Signed')) {
           clearPendingData();
           sendCardiologyViewerEvent('STUDY_COMPLETED', '');
@@ -1466,6 +1518,9 @@
 
     if (closeButton) {
       closeButton.onclick = function() {
+        logTroubleshooting('viewer close button clicked', {
+          studyId: getCurrentStudyId()
+        });
         sendCardiologyViewerEvent('VIEWER_CLOSE', '');
       };
     }
