@@ -179,6 +179,50 @@
     }
   }
 
+  function getQueryParam(name) {
+    var search = window.location.search || '';
+    var pairs;
+    var i;
+    var parts;
+
+    if (search.charAt(0) === '?') {
+      search = search.substring(1);
+    }
+
+    if (!search) {
+      return '';
+    }
+
+    pairs = search.split('&');
+    for (i = 0; i < pairs.length; i += 1) {
+      parts = pairs[i].split('=');
+      if (decodeURIComponent(parts[0] || '').toLowerCase() === name.toLowerCase()) {
+        return decodeURIComponent((parts[1] || '').replace(/\+/g, ' '));
+      }
+    }
+
+    return '';
+  }
+
+  function getStudyId() {
+    return getQueryParam('studyId') ||
+      getQueryParam('studyID') ||
+      getQueryParam('study_id') ||
+      getQueryParam('studyIdentifier') ||
+      getQueryParam('study_identifier') ||
+      getQueryParam('cerner_accession') ||
+      getQueryParam('cerner_studyIdentifier') ||
+      getQueryParam('cerner_study_identifier') ||
+      getQueryParam('__accession') ||
+      getQueryParam('__studyIdentifier') ||
+      getQueryParam('__study_identifier') ||
+      getQueryParam('accession') ||
+      getQueryParam('accessionNumber') ||
+      getQueryParam('accession_number') ||
+      safeSessionItem('smart_ecg_study_id') ||
+      '';
+  }
+
   function hasSmartContext() {
     var search = window.location.search || '';
     var hash = window.location.hash || '';
@@ -189,6 +233,7 @@
       search.indexOf('iss=') > -1 ||
       search.indexOf('fhirServiceUrl=') > -1 ||
       search.indexOf('patientId=') > -1 ||
+      !!getStudyId() ||
       hash.indexOf('access_token=') > -1 ||
       hash.indexOf('state=') > -1 ||
       !!safeSessionItem('tokenResponse');
@@ -340,7 +385,7 @@
     return '--';
   }
 
-  function normalizePatient(patient, observations) {
+  function normalizePatient(patient, observations, studyContext) {
     var fallback = defaultPatient();
     var name = getPatientName(patient);
     var patientId = getPrimaryIdentifier(patient);
@@ -349,6 +394,7 @@
     var ldl = getQuantityValueAndUnit(findObservation(observations, '2089-1'));
     var systolic = getBloodPressureValue(observations, '8480-6');
     var diastolic = getBloodPressureValue(observations, '8462-4');
+    var studyId = studyContext && studyContext.studyId ? studyContext.studyId : '';
 
     return {
       fname: name.first || fallback.fname,
@@ -358,7 +404,7 @@
       patientId: patientId || fallback.patientId,
       race: fallback.race,
       accountNumber: fallback.accountNumber,
-      accession: patientId ? 'ECG-' + patientId : fallback.accession,
+      accession: studyId || (patientId ? 'ECG-' + patientId : fallback.accession),
       performedAt: new Date(),
       height: height !== '--' ? height : fallback.height,
       weight: fallback.weight,
@@ -366,9 +412,193 @@
       diastolicbp: diastolic,
       ldl: ldl,
       hdl: hdl,
-      sourceStatus: 'SMART ECG',
+      sourceStatus: studyId ? 'SMART ECG Study' : 'SMART ECG',
       interpretation: fallback.interpretation
     };
+  }
+
+  function firstResource(result) {
+    var list = observationList(result);
+    return list.length ? list[0] : null;
+  }
+
+  function patientIdFromReference(reference) {
+    var value = reference && reference.reference ? reference.reference : reference;
+    var match;
+
+    if (!value || typeof value !== 'string') {
+      return '';
+    }
+
+    match = value.match(/Patient\/([^/?#]+)/i);
+    if (match && match[1]) {
+      return decodeURIComponent(match[1]);
+    }
+
+    return '';
+  }
+
+  function patientIdFromStudyResource(resource) {
+    if (!resource) {
+      return '';
+    }
+
+    return patientIdFromReference(resource.subject) ||
+      patientIdFromReference(resource.patient) ||
+      patientIdFromReference(resource.basedOn && resource.basedOn[0] && resource.basedOn[0].subject) ||
+      '';
+  }
+
+  function getStudySearchAttempts(studyId) {
+    return [
+      { type: 'DiagnosticReport', query: { identifier: studyId } },
+      { type: 'DiagnosticReport', query: { _id: studyId } },
+      { type: 'DiagnosticReport', query: { accession: studyId } },
+      { type: 'Observation', query: { identifier: studyId } },
+      { type: 'Observation', query: { _id: studyId } },
+      { type: 'ImagingStudy', query: { accession: studyId } },
+      { type: 'ImagingStudy', query: { identifier: studyId } },
+      { type: 'ImagingStudy', query: { uid: studyId } },
+      { type: 'ImagingStudy', query: { _id: studyId } },
+      { type: 'DocumentReference', query: { identifier: studyId } },
+      { type: 'DocumentReference', query: { _id: studyId } }
+    ];
+  }
+
+  function searchStudyResource(smart, studyId) {
+    var ret = makeDeferred();
+    var attempts = getStudySearchAttempts(studyId);
+    var api = smart && smart.api;
+
+    function next(index) {
+      var attempt;
+
+      if (!api || typeof api.fetchAll !== 'function') {
+        ret.reject('FHIR search is not available');
+        return;
+      }
+
+      if (index >= attempts.length) {
+        ret.reject('No FHIR study resource found for study id ' + studyId);
+        return;
+      }
+
+      attempt = attempts[index];
+      try {
+        toDeferred(api.fetchAll({
+          type: attempt.type,
+          query: attempt.query
+        })).done(function(result) {
+          var resource = firstResource(result);
+          var patientId = patientIdFromStudyResource(resource);
+
+          if (resource && patientId) {
+            ret.resolve({
+              resource: resource,
+              patientId: patientId,
+              studyId: studyId,
+              resourceType: attempt.type
+            });
+          } else {
+            next(index + 1);
+          }
+        }).fail(function() {
+          next(index + 1);
+        });
+      } catch (e) {
+        next(index + 1);
+      }
+    }
+
+    next(0);
+    return ret.promise();
+  }
+
+  function fetchObservationsForPatient(smart, patientId) {
+    var api = smart && smart.api;
+
+    if (smart &&
+        smart.patient &&
+        smart.patient.api &&
+        typeof smart.patient.api.fetchAll === 'function') {
+      api = smart.patient.api;
+    }
+
+    if (!api || typeof api.fetchAll !== 'function') {
+      return [];
+    }
+
+    return api.fetchAll({
+      type: 'Observation',
+      patient: patientId || undefined,
+      query: {
+        code: {
+          $or: [
+            'http://loinc.org|8302-2',
+            'http://loinc.org|8462-4',
+            'http://loinc.org|8480-6',
+            'http://loinc.org|2085-9',
+            'http://loinc.org|2089-1',
+            'http://loinc.org|55284-4'
+          ]
+        }
+      }
+    });
+  }
+
+  function readPatientById(smart, patientId) {
+    if (!smart || typeof smart.get !== 'function' || !patientId) {
+      return null;
+    }
+
+    return smart.get({
+      resource: 'Patient',
+      id: patientId
+    });
+  }
+
+  function readPatientFromStudyId(smart, studyId) {
+    var ret = makeDeferred();
+
+    if (!studyId) {
+      ret.reject('No study id supplied');
+      return ret.promise();
+    }
+
+    searchStudyResource(smart, studyId).done(function(studyContext) {
+      whenTwo(
+        readPatientById(smart, studyContext.patientId),
+        fetchObservationsForPatient(smart, studyContext.patientId),
+        function(patient, observations) {
+          ret.resolve(normalizePatient(patient, observations || [], studyContext));
+        },
+        function(error) {
+          ret.reject(error);
+        }
+      );
+    }).fail(function(error) {
+      ret.reject(error);
+    });
+
+    return ret.promise();
+  }
+
+  function readPatientFromLaunchContext(smart, studyId) {
+    var ret = makeDeferred();
+    var patientId = smart && smart.patient ? smart.patient.id : '';
+
+    whenTwo(
+      smart.patient.read(),
+      fetchObservationsForPatient(smart, patientId),
+      function(patient, observations) {
+        ret.resolve(normalizePatient(patient, observations || [], { studyId: studyId }));
+      },
+      function(error) {
+        ret.reject(error);
+      }
+    );
+
+    return ret.promise();
   }
 
   function failToDemo(ret, reason) {
@@ -398,45 +628,40 @@
 
     try {
       window.FHIR.oauth2.ready(function(smart) {
+        var studyId = getStudyId();
+
         setPvFrameworkPendingData(1);
 
-        if (!smart || !smart.patient || typeof smart.patient.read !== 'function') {
-          failToDemo(ret, 'SMART launch without patient context');
+        if (!smart) {
+          failToDemo(ret, 'SMART launch unavailable');
           return;
         }
 
-        var observations = [];
-        if (smart.patient.api && typeof smart.patient.api.fetchAll === 'function') {
-          observations = smart.patient.api.fetchAll({
-            type: 'Observation',
-            query: {
-              code: {
-                $or: [
-                  'http://loinc.org|8302-2',
-                  'http://loinc.org|8462-4',
-                  'http://loinc.org|8480-6',
-                  'http://loinc.org|2085-9',
-                  'http://loinc.org|2089-1',
-                  'http://loinc.org|55284-4'
-                ]
-              }
-            }
-          });
-        }
-
-        whenTwo(
-          smart.patient.read(),
-          observations,
-          function(patient, obv) {
-            ret.resolve(normalizePatient(patient, obv || []));
-          },
-          function(error) {
+        if (smart.patient && typeof smart.patient.read === 'function') {
+          readPatientFromLaunchContext(smart, studyId).done(function(patient) {
+            ret.resolve(patient);
+          }).fail(function(error) {
             if (window.console && typeof window.console.log === 'function') {
-              window.console.log('FHIR read failed; showing demo ECG', error);
+              window.console.log('FHIR patient read failed; showing demo ECG', error);
             }
             failToDemo(ret, 'Demo ECG');
-          }
-        );
+          });
+          return;
+        }
+
+        if (studyId) {
+          readPatientFromStudyId(smart, studyId).done(function(patient) {
+            ret.resolve(patient);
+          }).fail(function(error) {
+            if (window.console && typeof window.console.log === 'function') {
+              window.console.log('Study lookup failed; showing demo ECG', error);
+            }
+            failToDemo(ret, 'Study not found');
+          });
+          return;
+        }
+
+        failToDemo(ret, 'SMART launch without patient context');
       }, function(error) {
         if (window.console && typeof window.console.log === 'function') {
           window.console.log('SMART launch failed; showing demo ECG', error);
@@ -481,6 +706,10 @@
       '.smart-ecg-actions { display: flex; gap: .2rem; }',
       '.smart-ecg-actions .smart-ecg-button { color: #fff; background: transparent; }',
       '.smart-ecg-actions .smart-ecg-button:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.22); }',
+      '.smart-ecg-command { width: auto; min-width: 4rem; padding: 0 .65rem; gap: .3rem; color: #fff; border-color: rgba(255,255,255,.22); font-size: .76rem; font-weight: 800; }',
+      '.smart-ecg-command.smart-ecg-sign { background: rgba(37, 111, 58, .9); }',
+      '.smart-ecg-command.smart-ecg-save-action { background: rgba(255,255,255,.12); }',
+      'body.smart-ecg-editing .smart-ecg-interpretation { outline: 2px solid #88b7ff; background: #fff; }',
       '.smart-ecg-patient-grid { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 0; padding: .75rem .65rem .55rem; background: #fff; border-bottom: 1px solid #d4d9e1; }',
       '.smart-ecg-field { min-width: 0; min-height: 2.35rem; padding: 0 .48rem; border-right: 1px solid #e0e4ea; }',
       '.smart-ecg-field:last-child { border-right: 0; }',
@@ -604,7 +833,9 @@
       '<div class="smart-ecg-actions">',
       '<button class="smart-ecg-button" type="button" title="Copy link" aria-label="Copy link">', icon('link'), '</button>',
       '<button class="smart-ecg-button" id="smart-ecg-print" type="button" title="Print" aria-label="Print">', icon('print'), '</button>',
-      '<button class="smart-ecg-button" type="button" title="Edit" aria-label="Edit">', icon('edit'), '</button>',
+      '<button class="smart-ecg-button" id="smart-ecg-edit" type="button" title="Edit interpretation" aria-label="Edit interpretation">', icon('edit'), '</button>',
+      '<button class="smart-ecg-button smart-ecg-command smart-ecg-save-action" id="smart-ecg-save" type="button" title="Save ECG" aria-label="Save ECG">Save</button>',
+      '<button class="smart-ecg-button smart-ecg-command smart-ecg-sign" id="smart-ecg-sign" type="button" title="Sign ECG" aria-label="Sign ECG">Sign</button>',
       '<button class="smart-ecg-button" type="button" title="Menu" aria-label="Menu">', icon('menu'), '</button>',
       '</div>',
       '</div>',
@@ -644,7 +875,7 @@
       '</div>',
       '</aside>',
       '</div>',
-      '<button class="smart-ecg-save" type="button" title="Save ECG" aria-label="Save ECG">', icon('save'), '</button>'
+      '<button class="smart-ecg-save" id="smart-ecg-floating-save" type="button" title="Save ECG" aria-label="Save ECG">', icon('save'), '</button>'
     ].join('');
   }
 
@@ -883,11 +1114,127 @@
     drawCaption(svg, 1092, 666, '60 - 0.05 - 150 Hz');
   }
 
+  function getUiText(id) {
+    var node = byId(id);
+    return node ? node.textContent : '';
+  }
+
+  function setSourceStatus(value) {
+    setText('ecg-source-status', value);
+  }
+
+  function bodyHasClass(className) {
+    return (' ' + document.body.className + ' ').indexOf(' ' + className + ' ') > -1;
+  }
+
+  function addBodyClass(className) {
+    if (!bodyHasClass(className)) {
+      document.body.className = (document.body.className + ' ' + className).replace(/\s+/g, ' ');
+    }
+  }
+
+  function removeBodyClass(className) {
+    document.body.className = (' ' + document.body.className + ' ')
+      .replace(' ' + className + ' ', ' ')
+      .replace(/\s+/g, ' ');
+  }
+
+  function setEditMode(enabled) {
+    var interpretation = byId('ecg-interpretation');
+    var editButton = byId('smart-ecg-edit');
+
+    if (interpretation) {
+      interpretation.contentEditable = enabled ? 'true' : 'false';
+      if (enabled && typeof interpretation.focus === 'function') {
+        interpretation.focus();
+      }
+    }
+
+    if (enabled) {
+      addBodyClass('smart-ecg-editing');
+      setSourceStatus('Editing');
+    } else {
+      removeBodyClass('smart-ecg-editing');
+    }
+
+    if (editButton) {
+      editButton.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+      editButton.title = enabled ? 'Stop editing' : 'Edit interpretation';
+    }
+  }
+
+  function currentEcgPayload(status) {
+    return {
+      status: status,
+      savedAt: new Date().toISOString(),
+      accession: getUiText('ecg-accession'),
+      patientId: getUiText('ecg-patient-id'),
+      firstName: getUiText('ecg-first-name'),
+      lastName: getUiText('ecg-last-name'),
+      age: getUiText('ecg-age'),
+      dob: getUiText('ecg-dob'),
+      gender: getUiText('ecg-gender'),
+      performedAt: getUiText('ecg-performed-at'),
+      interpretation: getUiText('ecg-interpretation')
+    };
+  }
+
+  function saveEcg(status) {
+    var payload = currentEcgPayload(status);
+    var key = 'smart_ecg_' + (payload.accession || payload.patientId || 'current');
+
+    try {
+      if (window.localStorage) {
+        window.localStorage.setItem(key, JSON.stringify(payload));
+      }
+      setSourceStatus(status);
+      return true;
+    } catch (e) {
+      if (window.console && typeof window.console.log === 'function') {
+        window.console.log('Unable to save ECG locally', e);
+      }
+      setSourceStatus('Save failed');
+      return false;
+    }
+  }
+
   function attachActions() {
     var printButton = byId('smart-ecg-print');
+    var editButton = byId('smart-ecg-edit');
+    var saveButton = byId('smart-ecg-save');
+    var floatingSaveButton = byId('smart-ecg-floating-save');
+    var signButton = byId('smart-ecg-sign');
+
     if (printButton) {
       printButton.onclick = function() {
         window.print();
+      };
+    }
+
+    if (editButton) {
+      editButton.onclick = function() {
+        setEditMode(!bodyHasClass('smart-ecg-editing'));
+      };
+    }
+
+    if (saveButton) {
+      saveButton.onclick = function() {
+        saveEcg('Saved');
+      };
+    }
+
+    if (floatingSaveButton) {
+      floatingSaveButton.onclick = function() {
+        saveEcg('Saved');
+      };
+    }
+
+    if (signButton) {
+      signButton.onclick = function() {
+        if (saveEcg('Signed')) {
+          setEditMode(false);
+          setSourceStatus('Signed');
+        }
       };
     }
   }
