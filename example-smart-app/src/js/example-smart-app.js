@@ -988,7 +988,7 @@
     var dob = formatDate(patientData.birthdate);
 
     return [
-      { patientName: name, patientId: patientId, dob: dob, date: '10/5/2026  08:32:00', status: 'Open', orderNumber: '1819241381', modality: 'ECG', site: 'Baxter' },
+      { patientName: name, patientId: patientId, dob: dob, date: '10/5/2026  08:32:00', status: 'Open', orderNumber: '1819241381', modality: 'ECG', site: 'Baseline West Medical Center' },
       { patientName: name, patientId: patientId, dob: dob, date: '10/4/2026  23:01:00', status: 'Open', orderNumber: '1819281581', modality: 'ECG', site: 'Baseline West Medical Center' },
       { patientName: name, patientId: patientId, dob: dob, date: '10/5/2026  23:04:00', status: 'Open', orderNumber: '1819281631', modality: 'ECG', site: 'Baseline West Medical Center' },
       { patientName: name, patientId: patientId, dob: dob, date: '10/6/2026  23:13:00', status: 'Open', orderNumber: '1819282057', modality: 'ECG', site: 'Baseline West Medical Center' },
@@ -1239,9 +1239,6 @@
       '.study-match-date-field { display: flex; align-items: center; justify-content: space-between; height: 3.1rem; padding: 0 .25rem 0 .55rem; color: #8b939d; border-bottom: 1px solid #b8bec6; font-size: .84rem; }',
       '.study-match-side-button { width: 100%; height: 1.9rem; margin-top: .9rem; color: #fff; background: #005a9f; border: 0; border-radius: 3px; box-shadow: 0 1px 3px rgba(0,0,0,.25); font-size: .75rem; font-weight: 800; letter-spacing: .04em; }',
       '.study-match-side-button.secondary { margin-top: .45rem; color: #2d6394; background: #fff; border: 1px solid #d3d7dc; box-shadow: none; }',
-      '.study-match-support { margin-top: auto; padding-top: 2rem; text-align: center; color: #353f4a; line-height: 1.35; }',
-      '.study-match-brand { margin: 2.1rem 0 .4rem; color: #17649d; font-size: 1rem; font-style: italic; font-weight: 800; }',
-      '.study-match-product { color: #8a8f96; font-size: 1rem; font-weight: 500; }',
       '.study-match-main { position: relative; min-width: 0; overflow: hidden; background: #fff; }',
       '.study-match-topbar { display: flex; align-items: center; justify-content: space-between; height: 3.3rem; padding: 0 .9rem; color: #e9f3ff; background: #00589d; }',
       '.study-match-result-count { display: flex; align-items: center; gap: .5rem; color: #eaf4ff; font-size: .95rem; font-weight: 800; }',
@@ -1466,11 +1463,6 @@
       '<div class="study-match-date-field"><span>End Date</span><span>[]</span></div>',
       '<button class="study-match-side-button" type="button">SEARCH</button>',
       '<button class="study-match-side-button secondary" type="button">SAVE DEFAULTS</button>',
-      '<div class="study-match-support">',
-      '<div>For Support please call<br>1-844-754-9038</div>',
-      '<div class="study-match-brand">Baxter</div>',
-      '<div class="study-match-product">Cardio Server</div>',
-      '</div>',
       '</aside>'
     ].join('');
   }
