@@ -218,18 +218,49 @@
     }
   }
 
+  function normalizeContextKey(name) {
+    return String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  function isPatientContextKey(name) {
+    var key = normalizeContextKey(name);
+    return key === 'patient' || key === 'patientid';
+  }
+
+  function isAccessionContextKey(name) {
+    return normalizeContextKey(name).indexOf('accession') > -1;
+  }
+
+  function isStudyIdentifierContextKey(name) {
+    var key = normalizeContextKey(name);
+    return key === 'studyid' || key.indexOf('studyidentifier') > -1;
+  }
+
+  function objectValueByKeyMatcher(object, matcher) {
+    var key;
+    var value;
+
+    if (!object) {
+      return '';
+    }
+
+    for (key in object) {
+      if (Object.prototype.hasOwnProperty.call(object, key) && matcher(key)) {
+        value = object[key];
+        if (value !== undefined && value !== null && value !== '') {
+          return String(value);
+        }
+      }
+    }
+
+    return '';
+  }
+
   function hasLaunchIdentifiers(tokenResponse) {
     return !!(tokenResponse && (
-      tokenResponse.patient ||
-      tokenResponse.patientId ||
-      tokenResponse.patient_id ||
-      tokenResponse.cerner_accession ||
-      tokenResponse.cerner_studyidentifier ||
-      tokenResponse.cerner_studyIdentifier ||
-      tokenResponse.studyIdentifier ||
-      tokenResponse.accession ||
-      tokenResponse.accessionNumber ||
-      tokenResponse.accession_number
+      objectValueByKeyMatcher(tokenResponse, isPatientContextKey) ||
+      objectValueByKeyMatcher(tokenResponse, isAccessionContextKey) ||
+      objectValueByKeyMatcher(tokenResponse, isStudyIdentifierContextKey)
     ));
   }
 
@@ -311,6 +342,10 @@
     return '';
   }
 
+  function getTokenContextValue(smart, matcher) {
+    return objectValueByKeyMatcher(getTokenResponse(smart), matcher);
+  }
+
   function normalizeMrn(value) {
     return String(value === undefined || value === null ? '' : value)
       .replace(/^\s+|\s+$/g, '')
@@ -378,6 +413,31 @@
     return '';
   }
 
+  function getQueryContextValue(matcher) {
+    var search = window.location.search || '';
+    var pairs;
+    var i;
+    var parts;
+
+    if (search.charAt(0) === '?') {
+      search = search.substring(1);
+    }
+
+    if (!search) {
+      return '';
+    }
+
+    pairs = search.split('&');
+    for (i = 0; i < pairs.length; i += 1) {
+      parts = pairs[i].split('=');
+      if (matcher(decodeURIComponent(parts[0] || ''))) {
+        return decodeURIComponent((parts[1] || '').replace(/\+/g, ' '));
+      }
+    }
+
+    return '';
+  }
+
   function getStudyId(smart) {
     return getQueryParam('studyId') ||
       getQueryParam('studyID') ||
@@ -404,6 +464,10 @@
         'studyIdentifier',
         'study_id'
       ]) ||
+      getQueryContextValue(isAccessionContextKey) ||
+      getQueryContextValue(isStudyIdentifierContextKey) ||
+      getTokenContextValue(smart, isAccessionContextKey) ||
+      getTokenContextValue(smart, isStudyIdentifierContextKey) ||
       safeSessionItem('smart_ecg_study_id') ||
       '';
   }
