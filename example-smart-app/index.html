@@ -17,9 +17,7 @@
     </div>
     <div id="holder"></div>
 
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
-    <script src="./lib/js/fhir-client-v0.1.12.js"></script>
-    <script src="./lib/js/fhir-client-cerner-additions-1.0.0.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fhirclient/bundle/fhir-client.js"></script>
     <script src="./src/js/example-smart-app.js"></script>
     <script>
       extractData().then(
@@ -27,8 +25,14 @@
           drawVisualization(patient);
         },
         function() {
-          $('#loading').hide();
-          $('#errors').html('<p>Failed to call FHIR Service</p>');
+          var loading = document.getElementById('loading');
+          var errors = document.getElementById('errors');
+          if (loading) {
+            loading.style.display = 'none';
+          }
+          if (errors) {
+            errors.innerHTML = '<p>Failed to call FHIR Service</p>';
+          }
         }
       );
     </script>
