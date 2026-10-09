@@ -28,6 +28,52 @@
     <!-- Currently, the SMART App Launcher (https://launch.smarthealthit.org) does not check/validate the client_id field.
         If/when this changes, or when working with other authorization servers, please update the client_id field here. -->
     <script>
+      (function() {
+        var names = [
+          'studyId',
+          'studyID',
+          'study_id',
+          'studyIdentifier',
+          'study_identifier',
+          'cerner_accession',
+          'cerner_studyIdentifier',
+          'cerner_study_identifier',
+          '__accession',
+          '__studyIdentifier',
+          '__study_identifier',
+          'accession',
+          'accessionNumber',
+          'accession_number'
+        ];
+
+        function getParam(name) {
+          var query = window.location.search ? window.location.search.substring(1) : '';
+          var pairs = query ? query.split('&') : [];
+          var i;
+          var parts;
+
+          for (i = 0; i < pairs.length; i += 1) {
+            parts = pairs[i].split('=');
+            if (decodeURIComponent(parts[0] || '').toLowerCase() === name.toLowerCase()) {
+              return decodeURIComponent((parts[1] || '').replace(/\+/g, ' '));
+            }
+          }
+
+          return '';
+        }
+
+        for (var i = 0; i < names.length; i += 1) {
+          var value = getParam(names[i]);
+          if (value) {
+            try {
+              sessionStorage.setItem('smart_ecg_study_id', value);
+            } catch (e) {
+            }
+            break;
+          }
+        }
+      })();
+
       FHIR.oauth2.authorize({
         'client_id': '8844857c-07e8-43dc-865c-f5a1c217ebfb',
         'scope':  'patient/Patient.read patient/Observation.read launch online_access openid profile'
