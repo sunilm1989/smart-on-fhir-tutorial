@@ -21,6 +21,11 @@
     <!-- SMART JS Client Library for FHIR R4 -->
     <script src="https://cdn.jsdelivr.net/npm/fhirclient/bundle/fhir-client.js"></script>
     <script>
+      var SI01_CLIENT_ID = 'b7ce065d-3dae-4520-83b7-935d42e68a09';
+      var SI02_CLIENT_ID = '81ee9f73-4149-44ed-83b2-d726665a571e';
+      var SI01_FHIR_HOST = 'si01-fhir-ohehr-l1-adapters-dev-axkbv4jfb37h-px-pp.integration.us-phoenix-1.ocp.oraclecloud.com';
+      var SI02_FHIR_HOST = 'si02-fhir-ohehr-l1-adapters-dev-axkbv4jfb37h-px-pp.integration.us-phoenix-1.ocp.oraclecloud.com';
+
       var shouldAuthorize = (function() {
         var names = [
           'studyId',
@@ -84,12 +89,44 @@
         return true;
       })();
 
+      function getLaunchParam(name) {
+        var query = window.location.search ? window.location.search.substring(1) : '';
+        var pairs = query ? query.split('&') : [];
+        var i;
+        var parts;
+
+        for (i = 0; i < pairs.length; i += 1) {
+          parts = pairs[i].split('=');
+          if (decodeURIComponent(parts[0] || '').toLowerCase() === name.toLowerCase()) {
+            return decodeURIComponent((parts[1] || '').replace(/\+/g, ' '));
+          }
+        }
+
+        return '';
+      }
+
+      function resolveClientId() {
+        var issuer = (getLaunchParam('iss') || getLaunchParam('fhirServiceUrl') || '').toLowerCase();
+
+        if (issuer.indexOf(SI02_FHIR_HOST) > -1) {
+          return SI02_CLIENT_ID;
+        }
+
+        if (issuer.indexOf(SI01_FHIR_HOST) > -1) {
+          return SI01_CLIENT_ID;
+        }
+
+        return SI01_CLIENT_ID;
+      }
+
       if (shouldAuthorize) {
+        var clientId = resolveClientId();
+
         FHIR.oauth2.authorize({
-          clientId: 'b7ce065d-3dae-4520-83b7-935d42e68a09',
-          client_id: 'b7ce065d-3dae-4520-83b7-935d42e68a09',
-          redirectUri: './index.html',
-          redirect_uri: './index.html',
+          clientId: clientId,
+          client_id: clientId,
+          redirectUri: 'https://sunilm1989.github.io/smart-on-fhir-tutorial/example-smart-app/index.html',
+          redirect_uri: 'https://sunilm1989.github.io/smart-on-fhir-tutorial/example-smart-app/index.html',
           scope: 'launch/patient openid fhirUser patient/Patient.read patient/Observation.read patient/DiagnosticReport.read patient/ImagingStudy.read patient/DocumentReference.read'
         });
       }
